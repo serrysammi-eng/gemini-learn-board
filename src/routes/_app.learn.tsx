@@ -25,11 +25,11 @@ import { getAISettings, getPrefs } from "@/lib/storage";
 export const Route = createFileRoute("/_app/learn")({
   head: () => ({
     meta: [
-      { title: "AI Chalkboard — StudyMate AI" },
+      { title: "Learn — StudyMate AI" },
       {
         name: "description",
         content:
-          "Learn visually with Shiksha, an AI tutor that teaches with synchronized voice and handwriting.",
+          "Ask anything. Shiksha teaches line-by-line with visuals on top and synchronized voice + text below.",
       },
     ],
   }),
