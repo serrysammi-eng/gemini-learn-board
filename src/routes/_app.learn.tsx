@@ -481,6 +481,7 @@ function ChalkboardPage() {
                 settings={settings}
                 onSpeakingChange={setSpeaking}
                 onFinished={onLessonFinished}
+                onLineChange={setCurrentLine}
               />
             )}
 
