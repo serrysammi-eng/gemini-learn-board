@@ -239,12 +239,8 @@ function ChalkboardPage() {
   const [status, setStatus] = useState<"idle" | "generating" | "teaching" | "done">("idle");
   const [speaking, setSpeaking] = useState(false);
 
-  // Video state
-  const [videoTopic, setVideoTopic] = useState<string | null>(null);
-  const [videoId, setVideoId] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [videoLoading, setVideoLoading] = useState(false);
-  const [videoHidden, setVideoHidden] = useState(false); // hidden while doubt teaching
+  // Currently spoken sentence (lifted up from BoardScene for the top doodle box)
+  const [currentLine, setCurrentLine] = useState<string>("");
 
   // Doubt tracking
   const doubtLayerRef = useRef<0 | 1 | 2 | 3>(0);
