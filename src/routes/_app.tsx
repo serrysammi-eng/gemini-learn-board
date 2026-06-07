@@ -21,7 +21,6 @@ export const Route = createFileRoute("/_app")({
 
 const TABS = [
   { to: "/learn", label: "Learn", icon: BookOpen },
-  { to: "/chalkboard", label: "Board", icon: Presentation },
   { to: "/quiz", label: "Quiz", icon: Brain },
   { to: "/flashcards", label: "Cards", icon: Layers },
   { to: "/game", label: "Game", icon: Gamepad2 },
