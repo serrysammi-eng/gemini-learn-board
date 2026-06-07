@@ -267,35 +267,7 @@ function ChalkboardPage() {
     };
   }, []);
 
-  // Fetch visual reference (AI-generated illustration, no API key needed)
-  useEffect(() => {
-    if (!videoTopic) {
-      setVideoId(null);
-      setImageUrl(null);
-      return;
-    }
-    let active = true;
-    const fetchVisual = async () => {
-      setVideoLoading(true);
-      try {
-        const query = encodeURIComponent(`${videoTopic} educational explanation`);
-        const res = await fetch(`/api/video?q=${query}`, { method: "GET" });
-        if (!res.ok) throw new Error("Failed to fetch visual reference");
-        const data = await res.json();
-        if (!active) return;
-        if (data.imageUrl) setImageUrl(data.imageUrl);
-        if (data.videoId) setVideoId(data.videoId);
-      } catch (e) {
-        console.error("Failed to fetch visual reference:", e);
-      } finally {
-        if (active) setVideoLoading(false);
-      }
-    };
-    void fetchVisual();
-    return () => {
-      active = false;
-    };
-  }, [videoTopic]);
+  // (Removed YouTube/image visual-reference fetch — replaced by inline doodle box.)
 
   const primeAudio = useCallback(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
