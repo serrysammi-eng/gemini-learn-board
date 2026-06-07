@@ -288,7 +288,7 @@ function ChalkboardPage() {
       window.speechSynthesis.cancel();
     }
     setSpeaking(false);
-    setVideoHidden(false);
+    setCurrentLine("");
     setStatus((s) => (s === "idle" ? s : "done"));
   }, []);
 
@@ -305,29 +305,18 @@ function ChalkboardPage() {
         nextLayer = Math.min(3, (doubtLayerRef.current || 0) + 1) as 0 | 1 | 2 | 3;
         doubtLayerRef.current = nextLayer;
         topicForApi = originalTopicRef.current!;
-        setVideoHidden(true);
       } else {
         doubtLayerRef.current = 0;
         nextLayer = 0;
         originalTopicRef.current = q;
         topicForApi = undefined;
-
-        if (isConceptQuestion(q)) {
-          setVideoTopic(topicFromQuestion(q));
-        } else {
-          setVideoTopic(null);
-        }
-        setVideoHidden(false);
       }
 
       setQuestion(q);
       setLesson(null);
       setStatus("generating");
+      setCurrentLine("");
       primeAudio();
-
-      if (isDoubt && nextLayer === 3 && originalTopicRef.current) {
-        setVideoTopic(`${topicFromQuestion(originalTopicRef.current)} simple`);
-      }
 
       const ai = getAISettings();
       const ctrl = new AbortController();
