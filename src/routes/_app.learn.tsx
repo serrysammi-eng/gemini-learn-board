@@ -858,11 +858,13 @@ function BoardScene({
   settings,
   onSpeakingChange,
   onFinished,
+  onLineChange,
 }: {
   lesson: Lesson;
   settings: ChalkSettings;
   onSpeakingChange: (b: boolean) => void;
   onFinished: () => void;
+  onLineChange?: (line: string) => void;
 }) {
   const noteTokens = useMemo(() => {
     const tokens: Array<{ id: number; text: string; line: number; isHL: boolean }> = [];
