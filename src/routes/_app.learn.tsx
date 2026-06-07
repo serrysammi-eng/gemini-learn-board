@@ -7,7 +7,7 @@ import {
   Square,
   Volume2,
   VolumeX,
-  Loader2,
+  
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
