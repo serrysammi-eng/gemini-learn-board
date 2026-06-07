@@ -7,7 +7,7 @@ import {
   Square,
   Volume2,
   VolumeX,
-  Loader2,
+  
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -122,18 +122,6 @@ function isConceptQuestion(q: string) {
   if (CALC_RX.test(q)) return false;
   return CONCEPT_RX.test(q);
 }
-function topicFromQuestion(q: string) {
-  return q
-    .replace(
-      /^(please|kindly|can\s+you|could\s+you|tell\s+me|explain|describe|define|what\s+is|what\s+are|what\s+do|how\s+does|how\s+do|why\s+does|why\s+do|why\s+is|how\s+is)\s+/i,
-      "",
-    )
-    .replace(/[?.!]+\s*$/g, "")
-    .trim()
-    .split(/\s+/)
-    .slice(0, 6)
-    .join(" ");
-}
 
 /* ───────── Doubt detection ───────── */
 const DOUBT_PATTERNS: RegExp[] = [
@@ -239,12 +227,8 @@ function ChalkboardPage() {
   const [status, setStatus] = useState<"idle" | "generating" | "teaching" | "done">("idle");
   const [speaking, setSpeaking] = useState(false);
 
-  // Video state
-  const [videoTopic, setVideoTopic] = useState<string | null>(null);
-  const [videoId, setVideoId] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [videoLoading, setVideoLoading] = useState(false);
-  const [videoHidden, setVideoHidden] = useState(false); // hidden while doubt teaching
+  // Currently spoken sentence (lifted up from BoardScene for the top doodle box)
+  const [currentLine, setCurrentLine] = useState<string>("");
 
   // Doubt tracking
   const doubtLayerRef = useRef<0 | 1 | 2 | 3>(0);
@@ -271,35 +255,7 @@ function ChalkboardPage() {
     };
   }, []);
 
-  // Fetch visual reference (AI-generated illustration, no API key needed)
-  useEffect(() => {
-    if (!videoTopic) {
-      setVideoId(null);
-      setImageUrl(null);
-      return;
-    }
-    let active = true;
-    const fetchVisual = async () => {
-      setVideoLoading(true);
-      try {
-        const query = encodeURIComponent(`${videoTopic} educational explanation`);
-        const res = await fetch(`/api/video?q=${query}`, { method: "GET" });
-        if (!res.ok) throw new Error("Failed to fetch visual reference");
-        const data = await res.json();
-        if (!active) return;
-        if (data.imageUrl) setImageUrl(data.imageUrl);
-        if (data.videoId) setVideoId(data.videoId);
-      } catch (e) {
-        console.error("Failed to fetch visual reference:", e);
-      } finally {
-        if (active) setVideoLoading(false);
-      }
-    };
-    void fetchVisual();
-    return () => {
-      active = false;
-    };
-  }, [videoTopic]);
+  // (Removed YouTube/image visual-reference fetch — replaced by inline doodle box.)
 
   const primeAudio = useCallback(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -320,7 +276,7 @@ function ChalkboardPage() {
       window.speechSynthesis.cancel();
     }
     setSpeaking(false);
-    setVideoHidden(false);
+    setCurrentLine("");
     setStatus((s) => (s === "idle" ? s : "done"));
   }, []);
 
@@ -337,29 +293,18 @@ function ChalkboardPage() {
         nextLayer = Math.min(3, (doubtLayerRef.current || 0) + 1) as 0 | 1 | 2 | 3;
         doubtLayerRef.current = nextLayer;
         topicForApi = originalTopicRef.current!;
-        setVideoHidden(true);
       } else {
         doubtLayerRef.current = 0;
         nextLayer = 0;
         originalTopicRef.current = q;
         topicForApi = undefined;
-
-        if (isConceptQuestion(q)) {
-          setVideoTopic(topicFromQuestion(q));
-        } else {
-          setVideoTopic(null);
-        }
-        setVideoHidden(false);
       }
 
       setQuestion(q);
       setLesson(null);
       setStatus("generating");
+      setCurrentLine("");
       primeAudio();
-
-      if (isDoubt && nextLayer === 3 && originalTopicRef.current) {
-        setVideoTopic(`${topicFromQuestion(originalTopicRef.current)} simple`);
-      }
 
       const ai = getAISettings();
       const ctrl = new AbortController();
@@ -410,8 +355,6 @@ function ChalkboardPage() {
         if (parsed.chat) {
           doubtLayerRef.current = 0;
           originalTopicRef.current = null;
-          setVideoTopic(null);
-          setVideoHidden(false);
         }
         setLesson(parsed);
         setStatus("teaching");
@@ -443,7 +386,6 @@ function ChalkboardPage() {
 
   const onLessonFinished = useCallback(() => {
     setStatus("done");
-    setVideoHidden(false);
   }, []);
 
   const isBusy = status === "generating" || status === "teaching";
@@ -479,34 +421,39 @@ function ChalkboardPage() {
         <div className="chalkboard relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-purple-500/15 shadow-[inset_0_0_120px_rgba(0,0,0,0.6)]">
           <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-purple-500/10" />
 
-          {/* Visual reference (using resolved videoId via Piped API) */}
-          {!!videoTopic && !videoHidden && (
+          {/* Top doodle + current spoken line */}
+          {!!lesson && !lesson.chat && (
             <div
-              className="relative z-10 shrink-0 border-b border-purple-500/15 bg-black/40 px-3 pb-2 pt-2 animate-fade-in"
-              style={{ maxHeight: "40%" }}
+              className="relative z-10 shrink-0 border-b border-purple-500/15 bg-black/30 px-3 py-2 animate-fade-in"
+              style={{ maxHeight: "38%" }}
             >
-              <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-purple-400">
+              <div className="mb-1.5 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-purple-400">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
-                Visual reference
+                Now teaching
               </div>
-              <div
-                className="relative overflow-hidden rounded-xl border border-purple-500/15 bg-[#060d1a]"
-                style={{ aspectRatio: "16 / 9", maxHeight: "calc(40vh - 60px)" }}
-              >
-                {videoLoading || !imageUrl ? (
-                  <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin text-purple-400" />
-                    Generating visual reference…
-                  </div>
-                ) : (
-                  <img
-                    key={imageUrl}
-                    src={imageUrl}
-                    alt={`Visual reference for ${videoTopic}`}
-                    className="h-full w-full object-cover animate-fade-in"
-                    loading="lazy"
+              <div className="flex items-stretch gap-3">
+                <div
+                  className="relative shrink-0 overflow-hidden rounded-xl border border-purple-500/20 bg-[#060d1a] shadow-[inset_0_0_30px_rgba(139,92,246,0.15)]"
+                  style={{ width: 180, aspectRatio: "1 / 1" }}
+                >
+                  <DoodleBox
+                    line={currentLine}
+                    title={lesson.title}
+                    highlights={lesson.highlights}
                   />
-                )}
+                </div>
+                <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-amber-400/25 bg-amber-500/[0.04] px-4 py-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400/80">
+                    Line {currentLine ? "" : "1"}
+                  </div>
+                  <div
+                    key={currentLine}
+                    className="hand mt-1 text-xl leading-snug text-amber-100 sm:text-2xl animate-[fadeSlideUp_0.35s_ease-out_forwards]"
+                    style={{ textShadow: "0 0 10px rgba(245,158,11,0.3)" }}
+                  >
+                    {currentLine || lesson.title || "Listen as I draw it out…"}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -522,6 +469,7 @@ function ChalkboardPage() {
                 settings={settings}
                 onSpeakingChange={setSpeaking}
                 onFinished={onLessonFinished}
+                onLineChange={setCurrentLine}
               />
             )}
 
@@ -893,17 +841,143 @@ function ChatOnly({ text }: { text: string }) {
   );
 }
 
+/* ───────── Doodle box (top-left) ─────────
+   Re-draws a small hand-drawn chalk sketch whenever the spoken line changes.
+   Uses deterministic shapes seeded from the line's hash so each beat looks
+   different but stable while it's on screen. Stroke-dashoffset animates
+   the strokes left-to-right like a real chalkboard. */
+function DoodleBox({
+  line,
+  title,
+  highlights,
+}: {
+  line: string;
+  title: string;
+  highlights: string[];
+}) {
+  const seed = useMemo(() => {
+    let h = 5381;
+    const s = line || title || "x";
+    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return Math.abs(h);
+  }, [line, title]);
+
+  // Pick a couple of keywords to label the doodle
+  const label = useMemo(() => {
+    const src = line || highlights[0] || title || "";
+    const words = src
+      .split(/\s+/)
+      .map((w) => w.replace(/[^\p{L}\p{N}]+/gu, ""))
+      .filter((w) => w.length > 2);
+    return (words[0] || "idea").slice(0, 14);
+  }, [line, highlights, title]);
+
+  // Deterministic pseudo-random helpers
+  const rand = (i: number) => {
+    const x = Math.sin(seed + i * 9301) * 43758.5453;
+    return x - Math.floor(x);
+  };
+
+  const shapes = useMemo(() => {
+    // pick 3 shape "kinds" varying by seed
+    const kinds = ["circle", "triangle", "wave", "arrow", "leaf", "spark"] as const;
+    return [0, 1, 2].map((i) => {
+      const k = kinds[Math.floor(rand(i + 1) * kinds.length)];
+      const cx = 30 + rand(i + 7) * 100;
+      const cy = 35 + rand(i + 13) * 80;
+      const size = 18 + rand(i + 19) * 22;
+      return { k, cx, cy, size, i };
+    });
+  }, [seed]);
+
+  return (
+    <svg
+      key={seed}
+      viewBox="0 0 180 180"
+      className="h-full w-full"
+      fill="none"
+      stroke="rgba(216,180,254,0.95)"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {/* dotted board grid */}
+      <defs>
+        <pattern id="dots" width="14" height="14" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r="0.6" fill="rgba(167,139,250,0.18)" />
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="180" height="180" fill="url(#dots)" />
+
+      {shapes.map(({ k, cx, cy, size, i }) => {
+        const delay = i * 0.45;
+        const dash = 260;
+        const style = {
+          strokeDasharray: dash,
+          strokeDashoffset: dash,
+          animation: `doodle-draw 1.1s ease-out ${delay}s forwards`,
+        } as const;
+        if (k === "circle")
+          return <circle key={i} cx={cx} cy={cy} r={size} style={style} />;
+        if (k === "triangle") {
+          const p = `M ${cx} ${cy - size} L ${cx + size} ${cy + size} L ${cx - size} ${cy + size} Z`;
+          return <path key={i} d={p} style={style} />;
+        }
+        if (k === "wave") {
+          const p = `M ${cx - size} ${cy} Q ${cx - size / 2} ${cy - size}, ${cx} ${cy} T ${cx + size} ${cy}`;
+          return <path key={i} d={p} style={style} />;
+        }
+        if (k === "arrow") {
+          const p = `M ${cx - size} ${cy} L ${cx + size} ${cy} M ${cx + size - 6} ${cy - 5} L ${cx + size} ${cy} L ${cx + size - 6} ${cy + 5}`;
+          return <path key={i} d={p} style={style} />;
+        }
+        if (k === "leaf") {
+          const p = `M ${cx} ${cy - size} Q ${cx + size} ${cy}, ${cx} ${cy + size} Q ${cx - size} ${cy}, ${cx} ${cy - size} Z M ${cx} ${cy - size} L ${cx} ${cy + size}`;
+          return <path key={i} d={p} style={style} />;
+        }
+        // spark
+        const s = size * 0.7;
+        const p = `M ${cx - s} ${cy} L ${cx + s} ${cy} M ${cx} ${cy - s} L ${cx} ${cy + s} M ${cx - s * 0.7} ${cy - s * 0.7} L ${cx + s * 0.7} ${cy + s * 0.7} M ${cx + s * 0.7} ${cy - s * 0.7} L ${cx - s * 0.7} ${cy + s * 0.7}`;
+        return <path key={i} d={p} style={style} />;
+      })}
+
+      {/* handwritten label */}
+      <text
+        x="50%"
+        y="92%"
+        textAnchor="middle"
+        fontFamily="'Caveat', cursive"
+        fontSize="20"
+        fill="rgba(252,211,77,0.95)"
+        stroke="none"
+        style={{ opacity: 0, animation: "doodle-fade 0.6s ease-out 1.2s forwards" }}
+      >
+        {label}
+      </text>
+
+      <style>{`
+        @keyframes doodle-draw { to { stroke-dashoffset: 0; } }
+        @keyframes doodle-fade { to { opacity: 1; } }
+      `}</style>
+    </svg>
+  );
+}
+
+
+
 /* ───────── Board scene ───────── */
 function BoardScene({
   lesson,
   settings,
   onSpeakingChange,
   onFinished,
+  onLineChange,
 }: {
   lesson: Lesson;
   settings: ChalkSettings;
   onSpeakingChange: (b: boolean) => void;
   onFinished: () => void;
+  onLineChange?: (line: string) => void;
 }) {
   const noteTokens = useMemo(() => {
     const tokens: Array<{ id: number; text: string; line: number; isHL: boolean }> = [];
@@ -957,6 +1031,32 @@ function BoardScene({
   }, [lesson]);
 
   const [revealedUpTo, setRevealedUpTo] = useState(0);
+
+  // Push the currently spoken sentence up to the page so the top "Now teaching" box can mirror it.
+  useEffect(() => {
+    if (!onLineChange) return;
+    if (revealedUpTo === 0) {
+      onLineChange(lesson.notes[0] || lesson.title || "");
+      return;
+    }
+    const exp = lesson.explanation;
+    if (!exp) return;
+    // Find the sentence containing the last revealed word.
+    const lastIdx = Math.min(revealedUpTo, expTokens.length) - 1;
+    if (lastIdx < 0) return;
+    const charIdx = expTokens[lastIdx].end;
+    const before = exp.slice(0, charIdx);
+    const start = Math.max(
+      before.lastIndexOf(". ") + 2,
+      before.lastIndexOf("? ") + 2,
+      before.lastIndexOf("! ") + 2,
+      0,
+    );
+    const remainder = exp.slice(start);
+    const endRel = remainder.search(/[.?!]\s|$/);
+    const sentence = (endRel >= 0 ? remainder.slice(0, endRel + 1) : remainder).trim();
+    if (sentence) onLineChange(sentence);
+  }, [revealedUpTo, expTokens, lesson.explanation, lesson.notes, lesson.title, onLineChange]);
 
   useEffect(() => {
     setRevealedUpTo(0);
