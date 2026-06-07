@@ -398,7 +398,6 @@ function ChalkboardPage() {
 
   const onLessonFinished = useCallback(() => {
     setStatus("done");
-    setVideoHidden(false);
   }, []);
 
   const isBusy = status === "generating" || status === "teaching";
