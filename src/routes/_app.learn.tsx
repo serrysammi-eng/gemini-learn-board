@@ -919,6 +919,32 @@ function BoardScene({
 
   const [revealedUpTo, setRevealedUpTo] = useState(0);
 
+  // Push the currently spoken sentence up to the page so the top "Now teaching" box can mirror it.
+  useEffect(() => {
+    if (!onLineChange) return;
+    if (revealedUpTo === 0) {
+      onLineChange(lesson.notes[0] || lesson.title || "");
+      return;
+    }
+    const exp = lesson.explanation;
+    if (!exp) return;
+    // Find the sentence containing the last revealed word.
+    const lastIdx = Math.min(revealedUpTo, expTokens.length) - 1;
+    if (lastIdx < 0) return;
+    const charIdx = expTokens[lastIdx].end;
+    const before = exp.slice(0, charIdx);
+    const start = Math.max(
+      before.lastIndexOf(". ") + 2,
+      before.lastIndexOf("? ") + 2,
+      before.lastIndexOf("! ") + 2,
+      0,
+    );
+    const remainder = exp.slice(start);
+    const endRel = remainder.search(/[.?!]\s|$/);
+    const sentence = (endRel >= 0 ? remainder.slice(0, endRel + 1) : remainder).trim();
+    if (sentence) onLineChange(sentence);
+  }, [revealedUpTo, expTokens, lesson.explanation, lesson.notes, lesson.title, onLineChange]);
+
   useEffect(() => {
     setRevealedUpTo(0);
 
