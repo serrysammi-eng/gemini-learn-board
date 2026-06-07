@@ -853,6 +853,130 @@ function ChatOnly({ text }: { text: string }) {
   );
 }
 
+/* ───────── Doodle box (top-left) ─────────
+   Re-draws a small hand-drawn chalk sketch whenever the spoken line changes.
+   Uses deterministic shapes seeded from the line's hash so each beat looks
+   different but stable while it's on screen. Stroke-dashoffset animates
+   the strokes left-to-right like a real chalkboard. */
+function DoodleBox({
+  line,
+  title,
+  highlights,
+}: {
+  line: string;
+  title: string;
+  highlights: string[];
+}) {
+  const seed = useMemo(() => {
+    let h = 5381;
+    const s = line || title || "x";
+    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return Math.abs(h);
+  }, [line, title]);
+
+  // Pick a couple of keywords to label the doodle
+  const label = useMemo(() => {
+    const src = line || highlights[0] || title || "";
+    const words = src
+      .split(/\s+/)
+      .map((w) => w.replace(/[^\p{L}\p{N}]+/gu, ""))
+      .filter((w) => w.length > 2);
+    return (words[0] || "idea").slice(0, 14);
+  }, [line, highlights, title]);
+
+  // Deterministic pseudo-random helpers
+  const rand = (i: number) => {
+    const x = Math.sin(seed + i * 9301) * 43758.5453;
+    return x - Math.floor(x);
+  };
+
+  const shapes = useMemo(() => {
+    // pick 3 shape "kinds" varying by seed
+    const kinds = ["circle", "triangle", "wave", "arrow", "leaf", "spark"] as const;
+    return [0, 1, 2].map((i) => {
+      const k = kinds[Math.floor(rand(i + 1) * kinds.length)];
+      const cx = 30 + rand(i + 7) * 100;
+      const cy = 35 + rand(i + 13) * 80;
+      const size = 18 + rand(i + 19) * 22;
+      return { k, cx, cy, size, i };
+    });
+  }, [seed]);
+
+  return (
+    <svg
+      key={seed}
+      viewBox="0 0 180 180"
+      className="h-full w-full"
+      fill="none"
+      stroke="rgba(216,180,254,0.95)"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {/* dotted board grid */}
+      <defs>
+        <pattern id="dots" width="14" height="14" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r="0.6" fill="rgba(167,139,250,0.18)" />
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="180" height="180" fill="url(#dots)" />
+
+      {shapes.map(({ k, cx, cy, size, i }) => {
+        const delay = i * 0.45;
+        const dash = 260;
+        const style = {
+          strokeDasharray: dash,
+          strokeDashoffset: dash,
+          animation: `doodle-draw 1.1s ease-out ${delay}s forwards`,
+        } as const;
+        if (k === "circle")
+          return <circle key={i} cx={cx} cy={cy} r={size} style={style} />;
+        if (k === "triangle") {
+          const p = `M ${cx} ${cy - size} L ${cx + size} ${cy + size} L ${cx - size} ${cy + size} Z`;
+          return <path key={i} d={p} style={style} />;
+        }
+        if (k === "wave") {
+          const p = `M ${cx - size} ${cy} Q ${cx - size / 2} ${cy - size}, ${cx} ${cy} T ${cx + size} ${cy}`;
+          return <path key={i} d={p} style={style} />;
+        }
+        if (k === "arrow") {
+          const p = `M ${cx - size} ${cy} L ${cx + size} ${cy} M ${cx + size - 6} ${cy - 5} L ${cx + size} ${cy} L ${cx + size - 6} ${cy + 5}`;
+          return <path key={i} d={p} style={style} />;
+        }
+        if (k === "leaf") {
+          const p = `M ${cx} ${cy - size} Q ${cx + size} ${cy}, ${cx} ${cy + size} Q ${cx - size} ${cy}, ${cx} ${cy - size} Z M ${cx} ${cy - size} L ${cx} ${cy + size}`;
+          return <path key={i} d={p} style={style} />;
+        }
+        // spark
+        const s = size * 0.7;
+        const p = `M ${cx - s} ${cy} L ${cx + s} ${cy} M ${cx} ${cy - s} L ${cx} ${cy + s} M ${cx - s * 0.7} ${cy - s * 0.7} L ${cx + s * 0.7} ${cy + s * 0.7} M ${cx + s * 0.7} ${cy - s * 0.7} L ${cx - s * 0.7} ${cy + s * 0.7}`;
+        return <path key={i} d={p} style={style} />;
+      })}
+
+      {/* handwritten label */}
+      <text
+        x="50%"
+        y="92%"
+        textAnchor="middle"
+        fontFamily="'Caveat', cursive"
+        fontSize="20"
+        fill="rgba(252,211,77,0.95)"
+        stroke="none"
+        style={{ opacity: 0, animation: "doodle-fade 0.6s ease-out 1.2s forwards" }}
+      >
+        {label}
+      </text>
+
+      <style>{`
+        @keyframes doodle-draw { to { stroke-dashoffset: 0; } }
+        @keyframes doodle-fade { to { opacity: 1; } }
+      `}</style>
+    </svg>
+  );
+}
+
+
+
 /* ───────── Board scene ───────── */
 function BoardScene({
   lesson,
