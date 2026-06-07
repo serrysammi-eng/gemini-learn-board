@@ -122,18 +122,6 @@ function isConceptQuestion(q: string) {
   if (CALC_RX.test(q)) return false;
   return CONCEPT_RX.test(q);
 }
-function topicFromQuestion(q: string) {
-  return q
-    .replace(
-      /^(please|kindly|can\s+you|could\s+you|tell\s+me|explain|describe|define|what\s+is|what\s+are|what\s+do|how\s+does|how\s+do|why\s+does|why\s+do|why\s+is|how\s+is)\s+/i,
-      "",
-    )
-    .replace(/[?.!]+\s*$/g, "")
-    .trim()
-    .split(/\s+/)
-    .slice(0, 6)
-    .join(" ");
-}
 
 /* ───────── Doubt detection ───────── */
 const DOUBT_PATTERNS: RegExp[] = [
