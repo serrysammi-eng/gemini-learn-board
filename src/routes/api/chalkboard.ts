@@ -118,9 +118,11 @@ Plain text only. No markdown bold, no code fences, no emojis.
 TITLE: <topic, 2-6 words>
 
 NOTES:
-- <key point/math step/code line 1, max ~60 chars>
-- <key point/math step/code line 2>
-- <key point/math step/code line 3>   (3 to 5 bullets total — keep SHORT, this is a chunk not an essay)
+- <bullet 1, max ~70 chars — first teaching beat>
+- <bullet 2>
+- <bullet 3>
+- <bullet 4>
+- <bullet 5>   (5 to 7 bullets — each bullet is ONE clear teaching beat the visual on top can illustrate)
 
 HIGHLIGHT: <single word or short phrase from the NOTES to emphasize>
 HIGHLIGHT: <another key term from NOTES>   (2 to 4 HIGHLIGHT lines)
@@ -132,9 +134,14 @@ DIAGRAM:
   (max 4 boxes & 4 arrows. If the topic does not need a diagram output exactly:  DIAGRAM: none)
 
 EXPLANATION:
-<MAXIMUM 3 short sentences a teacher would SAY out loud. Mention the HIGHLIGHT
-terms naturally. END with ONE simple check-question like
-"Samajh aaya?" / "Got it?" / "Theek hai?".>
+<A DEEP, complete teacher-style explanation in 6 to 10 short sentences. Each
+sentence must map to one of the NOTES bullets in the SAME order so the on-screen
+doodle and the spoken voice stay in sync. Use natural spoken language a tutor
+would actually say out loud. You MUST include at least ONE concrete real-life
+worked example (cricket, food, Bollywood, train, mobile phone, school) and
+explain WHY each step matters, not just WHAT it is. Mention the HIGHLIGHT terms
+naturally. END with ONE simple check-question like "Samajh aaya?" / "Got it?" /
+"Theek hai?".>
 
 END
 
@@ -142,7 +149,8 @@ HARD RULES:
 - Headers (TITLE / NOTES / HIGHLIGHT / DIAGRAM / EXPLANATION / END) start at column 1.
 - NOTES bullets and DIAGRAM lines MUST start with "- ".
 - Every HIGHLIGHT term must appear literally inside NOTES.
-- EXPLANATION is max 3 sentences and ends with a question.
+- EXPLANATION must be 6 to 10 sentences, include a real-world worked example, and end with a question.
+- The number and order of EXPLANATION sentences should match the NOTES bullets.
 - Finish with END on its own line.`;
 }
 
