@@ -367,8 +367,6 @@ function ChalkboardPage() {
         if (parsed.chat) {
           doubtLayerRef.current = 0;
           originalTopicRef.current = null;
-          setVideoTopic(null);
-          setVideoHidden(false);
         }
         setLesson(parsed);
         setStatus("teaching");
