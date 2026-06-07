@@ -17,10 +17,8 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiChalkboardRouteImport } from './routes/api/chalkboard'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppQuizRouteImport } from './routes/_app.quiz'
-import { Route as AppLearnRouteImport } from './routes/_app.learn'
 import { Route as AppGameRouteImport } from './routes/_app.game'
 import { Route as AppFlashcardsRouteImport } from './routes/_app.flashcards'
-import { Route as AppChalkboardRouteImport } from './routes/_app.chalkboard'
 
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
@@ -61,11 +59,6 @@ const AppQuizRoute = AppQuizRouteImport.update({
   path: '/quiz',
   getParentRoute: () => AppRoute,
 } as any)
-const AppLearnRoute = AppLearnRouteImport.update({
-  id: '/learn',
-  path: '/learn',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppGameRoute = AppGameRouteImport.update({
   id: '/game',
   path: '/game',
@@ -76,19 +69,12 @@ const AppFlashcardsRoute = AppFlashcardsRouteImport.update({
   path: '/flashcards',
   getParentRoute: () => AppRoute,
 } as any)
-const AppChalkboardRoute = AppChalkboardRouteImport.update({
-  id: '/chalkboard',
-  path: '/chalkboard',
-  getParentRoute: () => AppRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/onboarding': typeof OnboardingRoute
-  '/chalkboard': typeof AppChalkboardRoute
   '/flashcards': typeof AppFlashcardsRoute
   '/game': typeof AppGameRoute
-  '/learn': typeof AppLearnRoute
   '/quiz': typeof AppQuizRoute
   '/settings': typeof AppSettingsRoute
   '/api/chalkboard': typeof ApiChalkboardRoute
@@ -98,10 +84,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/onboarding': typeof OnboardingRoute
-  '/chalkboard': typeof AppChalkboardRoute
   '/flashcards': typeof AppFlashcardsRoute
   '/game': typeof AppGameRoute
-  '/learn': typeof AppLearnRoute
   '/quiz': typeof AppQuizRoute
   '/settings': typeof AppSettingsRoute
   '/api/chalkboard': typeof ApiChalkboardRoute
@@ -113,10 +97,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/onboarding': typeof OnboardingRoute
-  '/_app/chalkboard': typeof AppChalkboardRoute
   '/_app/flashcards': typeof AppFlashcardsRoute
   '/_app/game': typeof AppGameRoute
-  '/_app/learn': typeof AppLearnRoute
   '/_app/quiz': typeof AppQuizRoute
   '/_app/settings': typeof AppSettingsRoute
   '/api/chalkboard': typeof ApiChalkboardRoute
@@ -128,10 +110,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/onboarding'
-    | '/chalkboard'
     | '/flashcards'
     | '/game'
-    | '/learn'
     | '/quiz'
     | '/settings'
     | '/api/chalkboard'
@@ -141,10 +121,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/onboarding'
-    | '/chalkboard'
     | '/flashcards'
     | '/game'
-    | '/learn'
     | '/quiz'
     | '/settings'
     | '/api/chalkboard'
@@ -155,10 +133,8 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/onboarding'
-    | '/_app/chalkboard'
     | '/_app/flashcards'
     | '/_app/game'
-    | '/_app/learn'
     | '/_app/quiz'
     | '/_app/settings'
     | '/api/chalkboard'
@@ -233,13 +209,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppQuizRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/learn': {
-      id: '/_app/learn'
-      path: '/learn'
-      fullPath: '/learn'
-      preLoaderRoute: typeof AppLearnRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/game': {
       id: '/_app/game'
       path: '/game'
@@ -254,30 +223,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFlashcardsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/chalkboard': {
-      id: '/_app/chalkboard'
-      path: '/chalkboard'
-      fullPath: '/chalkboard'
-      preLoaderRoute: typeof AppChalkboardRouteImport
-      parentRoute: typeof AppRoute
-    }
   }
 }
 
 interface AppRouteChildren {
-  AppChalkboardRoute: typeof AppChalkboardRoute
   AppFlashcardsRoute: typeof AppFlashcardsRoute
   AppGameRoute: typeof AppGameRoute
-  AppLearnRoute: typeof AppLearnRoute
   AppQuizRoute: typeof AppQuizRoute
   AppSettingsRoute: typeof AppSettingsRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppChalkboardRoute: AppChalkboardRoute,
   AppFlashcardsRoute: AppFlashcardsRoute,
   AppGameRoute: AppGameRoute,
-  AppLearnRoute: AppLearnRoute,
   AppQuizRoute: AppQuizRoute,
   AppSettingsRoute: AppSettingsRoute,
 }
