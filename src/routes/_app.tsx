@@ -7,7 +7,6 @@ import {
   Settings,
   Flame,
   Trophy,
-  Presentation,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
