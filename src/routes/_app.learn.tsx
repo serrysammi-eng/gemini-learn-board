@@ -433,34 +433,39 @@ function ChalkboardPage() {
         <div className="chalkboard relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-purple-500/15 shadow-[inset_0_0_120px_rgba(0,0,0,0.6)]">
           <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-purple-500/10" />
 
-          {/* Visual reference (using resolved videoId via Piped API) */}
-          {!!videoTopic && !videoHidden && (
+          {/* Top doodle + current spoken line */}
+          {!!lesson && !lesson.chat && (
             <div
-              className="relative z-10 shrink-0 border-b border-purple-500/15 bg-black/40 px-3 pb-2 pt-2 animate-fade-in"
-              style={{ maxHeight: "40%" }}
+              className="relative z-10 shrink-0 border-b border-purple-500/15 bg-black/30 px-3 py-2 animate-fade-in"
+              style={{ maxHeight: "38%" }}
             >
-              <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-purple-400">
+              <div className="mb-1.5 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-purple-400">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
-                Visual reference
+                Now teaching
               </div>
-              <div
-                className="relative overflow-hidden rounded-xl border border-purple-500/15 bg-[#060d1a]"
-                style={{ aspectRatio: "16 / 9", maxHeight: "calc(40vh - 60px)" }}
-              >
-                {videoLoading || !imageUrl ? (
-                  <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin text-purple-400" />
-                    Generating visual reference…
-                  </div>
-                ) : (
-                  <img
-                    key={imageUrl}
-                    src={imageUrl}
-                    alt={`Visual reference for ${videoTopic}`}
-                    className="h-full w-full object-cover animate-fade-in"
-                    loading="lazy"
+              <div className="flex items-stretch gap-3">
+                <div
+                  className="relative shrink-0 overflow-hidden rounded-xl border border-purple-500/20 bg-[#060d1a] shadow-[inset_0_0_30px_rgba(139,92,246,0.15)]"
+                  style={{ width: 180, aspectRatio: "1 / 1" }}
+                >
+                  <DoodleBox
+                    line={currentLine}
+                    title={lesson.title}
+                    highlights={lesson.highlights}
                   />
-                )}
+                </div>
+                <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-amber-400/25 bg-amber-500/[0.04] px-4 py-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400/80">
+                    Line {currentLine ? "" : "1"}
+                  </div>
+                  <div
+                    key={currentLine}
+                    className="hand mt-1 text-xl leading-snug text-amber-100 sm:text-2xl animate-[fadeSlideUp_0.35s_ease-out_forwards]"
+                    style={{ textShadow: "0 0 10px rgba(245,158,11,0.3)" }}
+                  >
+                    {currentLine || lesson.title || "Listen as I draw it out…"}
+                  </div>
+                </div>
               </div>
             </div>
           )}
