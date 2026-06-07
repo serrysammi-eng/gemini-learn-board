@@ -17,6 +17,7 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiChalkboardRouteImport } from './routes/api/chalkboard'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppQuizRouteImport } from './routes/_app.quiz'
+import { Route as AppLearnRouteImport } from './routes/_app.learn'
 import { Route as AppGameRouteImport } from './routes/_app.game'
 import { Route as AppFlashcardsRouteImport } from './routes/_app.flashcards'
 
@@ -59,6 +60,11 @@ const AppQuizRoute = AppQuizRouteImport.update({
   path: '/quiz',
   getParentRoute: () => AppRoute,
 } as any)
+const AppLearnRoute = AppLearnRouteImport.update({
+  id: '/learn',
+  path: '/learn',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppGameRoute = AppGameRouteImport.update({
   id: '/game',
   path: '/game',
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/flashcards': typeof AppFlashcardsRoute
   '/game': typeof AppGameRoute
+  '/learn': typeof AppLearnRoute
   '/quiz': typeof AppQuizRoute
   '/settings': typeof AppSettingsRoute
   '/api/chalkboard': typeof ApiChalkboardRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/flashcards': typeof AppFlashcardsRoute
   '/game': typeof AppGameRoute
+  '/learn': typeof AppLearnRoute
   '/quiz': typeof AppQuizRoute
   '/settings': typeof AppSettingsRoute
   '/api/chalkboard': typeof ApiChalkboardRoute
@@ -99,6 +107,7 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/_app/flashcards': typeof AppFlashcardsRoute
   '/_app/game': typeof AppGameRoute
+  '/_app/learn': typeof AppLearnRoute
   '/_app/quiz': typeof AppQuizRoute
   '/_app/settings': typeof AppSettingsRoute
   '/api/chalkboard': typeof ApiChalkboardRoute
@@ -112,6 +121,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/flashcards'
     | '/game'
+    | '/learn'
     | '/quiz'
     | '/settings'
     | '/api/chalkboard'
@@ -123,6 +133,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/flashcards'
     | '/game'
+    | '/learn'
     | '/quiz'
     | '/settings'
     | '/api/chalkboard'
@@ -135,6 +146,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/_app/flashcards'
     | '/_app/game'
+    | '/_app/learn'
     | '/_app/quiz'
     | '/_app/settings'
     | '/api/chalkboard'
@@ -209,6 +221,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppQuizRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/learn': {
+      id: '/_app/learn'
+      path: '/learn'
+      fullPath: '/learn'
+      preLoaderRoute: typeof AppLearnRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/game': {
       id: '/_app/game'
       path: '/game'
@@ -229,6 +248,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppFlashcardsRoute: typeof AppFlashcardsRoute
   AppGameRoute: typeof AppGameRoute
+  AppLearnRoute: typeof AppLearnRoute
   AppQuizRoute: typeof AppQuizRoute
   AppSettingsRoute: typeof AppSettingsRoute
 }
@@ -236,6 +256,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppFlashcardsRoute: AppFlashcardsRoute,
   AppGameRoute: AppGameRoute,
+  AppLearnRoute: AppLearnRoute,
   AppQuizRoute: AppQuizRoute,
   AppSettingsRoute: AppSettingsRoute,
 }
