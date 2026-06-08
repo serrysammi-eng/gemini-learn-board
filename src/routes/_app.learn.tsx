@@ -1051,8 +1051,16 @@ function BoardScene({
     let boundaryFired = false;
     let fallbackInterval: ReturnType<typeof setInterval> | null = null;
     let fallbackTimeout: ReturnType<typeof setTimeout> | null = null;
+    let keepAlive: ReturnType<typeof setInterval> | null = null;
 
     window.speechSynthesis.cancel();
+    // Some browsers (Chrome) silently drop a speak() that comes too soon after cancel().
+    // Resume() any paused state first.
+    try {
+      window.speechSynthesis.resume();
+    } catch {
+      /* noop */
+    }
     const u = new SpeechSynthesisUtterance(lesson.explanation);
     const v = pickVoice(settings.language, settings.voice);
     if (v) {
@@ -1065,6 +1073,20 @@ function BoardScene({
 
     u.onstart = () => {
       onSpeakingChange(true);
+
+      // Chrome bug: speechSynthesis silently pauses after ~15 seconds.
+      // Pinging pause()+resume() every 8s keeps it alive. This is what
+      // makes subsequent lessons actually play instead of going silent.
+      keepAlive = setInterval(() => {
+        try {
+          if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.pause();
+            window.speechSynthesis.resume();
+          }
+        } catch {
+          /* noop */
+        }
+      }, 8000);
 
       // Fallback timer: starts after 1.5s if no boundary event fires
       fallbackTimeout = setTimeout(() => {
@@ -1108,8 +1130,14 @@ function BoardScene({
       }
     };
 
+    const stopKeepAlive = () => {
+      if (keepAlive) clearInterval(keepAlive);
+      keepAlive = null;
+    };
+
     u.onend = () => {
       onSpeakingChange(false);
+      stopKeepAlive();
       if (fallbackTimeout) clearTimeout(fallbackTimeout);
       if (fallbackInterval) clearInterval(fallbackInterval);
       setRevealedUpTo(expTokens.length);
@@ -1117,22 +1145,26 @@ function BoardScene({
     };
     u.onerror = () => {
       onSpeakingChange(false);
+      stopKeepAlive();
       if (fallbackTimeout) clearTimeout(fallbackTimeout);
       if (fallbackInterval) clearInterval(fallbackInterval);
       setRevealedUpTo(expTokens.length);
       onFinished();
     };
 
+    // Slightly longer delay (200ms) gives Chrome time to fully reset after cancel().
+    // 80ms wasn't enough — that's why the second lesson's voice was dropped.
     const t = setTimeout(() => {
       try {
         window.speechSynthesis.speak(u);
       } catch {
         boundaryFired = false;
       }
-    }, 80);
+    }, 200);
 
     return () => {
       clearTimeout(t);
+      stopKeepAlive();
       if (fallbackTimeout) clearTimeout(fallbackTimeout);
       if (fallbackInterval) clearInterval(fallbackInterval);
       window.speechSynthesis.cancel();
