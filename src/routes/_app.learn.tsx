@@ -846,12 +846,8 @@ function ChatOnly({ text }: { text: string }) {
    INSTANT: Pollinations.ai URL renders immediately (no fetch, no wait).
    UPGRADE: Lovable AI image streams in behind it and replaces when ready.
    Both are cached per-line so repeats are instant. */
-import {
-  doodleCache as sharedDoodleCache,
-  doodleKey,
-  fetchDoodleImage as sharedFetchDoodleImage,
-  instantDoodle,
-} from "@/lib/doodle-cache";
+
+
 
 function DoodleBox({ line, topic }: { line: string; topic?: string }) {
   // Pollinations URL — instant, no fetch, just an <img src=…>.
