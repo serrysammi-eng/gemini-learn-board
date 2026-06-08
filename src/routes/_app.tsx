@@ -4,6 +4,7 @@ import {
   Brain,
   Gamepad2,
   Layers,
+  Map as MapIcon,
   Settings,
   Flame,
   Trophy,
@@ -12,6 +13,7 @@ import { useEffect, useState } from "react";
 
 import { AITutor } from "@/components/AITutor";
 import { cn } from "@/lib/utils";
+import { ensureRoadmap } from "@/lib/roadmap";
 import { getPrefs, getProgress } from "@/lib/storage";
 
 export const Route = createFileRoute("/_app")({
@@ -20,6 +22,7 @@ export const Route = createFileRoute("/_app")({
 
 const TABS = [
   { to: "/learn", label: "Learn", icon: BookOpen },
+  { to: "/roadmap", label: "Roadmap", icon: MapIcon },
   { to: "/quiz", label: "Quiz", icon: Brain },
   { to: "/flashcards", label: "Cards", icon: Layers },
   { to: "/game", label: "Game", icon: Gamepad2 },
