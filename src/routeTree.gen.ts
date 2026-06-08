@@ -12,11 +12,13 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiRoadmapChapterRouteImport } from './routes/api/roadmap-chapter'
 import { Route as ApiRoadmapRouteImport } from './routes/api/roadmap'
 import { Route as ApiDoodleImageRouteImport } from './routes/api/doodle-image'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiChalkboardRouteImport } from './routes/api/chalkboard'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
+import { Route as AppRoadmapRouteImport } from './routes/_app.roadmap'
 import { Route as AppQuizRouteImport } from './routes/_app.quiz'
 import { Route as AppLearnRouteImport } from './routes/_app.learn'
 import { Route as AppGameRouteImport } from './routes/_app.game'
@@ -34,6 +36,11 @@ const AppRoute = AppRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRoadmapChapterRoute = ApiRoadmapChapterRouteImport.update({
+  id: '/api/roadmap-chapter',
+  path: '/api/roadmap-chapter',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRoadmapRoute = ApiRoadmapRouteImport.update({
@@ -59,6 +66,11 @@ const ApiChalkboardRoute = ApiChalkboardRouteImport.update({
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRoadmapRoute = AppRoadmapRouteImport.update({
+  id: '/roadmap',
+  path: '/roadmap',
   getParentRoute: () => AppRoute,
 } as any)
 const AppQuizRoute = AppQuizRouteImport.update({
@@ -89,11 +101,13 @@ export interface FileRoutesByFullPath {
   '/game': typeof AppGameRoute
   '/learn': typeof AppLearnRoute
   '/quiz': typeof AppQuizRoute
+  '/roadmap': typeof AppRoadmapRoute
   '/settings': typeof AppSettingsRoute
   '/api/chalkboard': typeof ApiChalkboardRoute
   '/api/chat': typeof ApiChatRoute
   '/api/doodle-image': typeof ApiDoodleImageRoute
   '/api/roadmap': typeof ApiRoadmapRoute
+  '/api/roadmap-chapter': typeof ApiRoadmapChapterRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -102,11 +116,13 @@ export interface FileRoutesByTo {
   '/game': typeof AppGameRoute
   '/learn': typeof AppLearnRoute
   '/quiz': typeof AppQuizRoute
+  '/roadmap': typeof AppRoadmapRoute
   '/settings': typeof AppSettingsRoute
   '/api/chalkboard': typeof ApiChalkboardRoute
   '/api/chat': typeof ApiChatRoute
   '/api/doodle-image': typeof ApiDoodleImageRoute
   '/api/roadmap': typeof ApiRoadmapRoute
+  '/api/roadmap-chapter': typeof ApiRoadmapChapterRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -117,11 +133,13 @@ export interface FileRoutesById {
   '/_app/game': typeof AppGameRoute
   '/_app/learn': typeof AppLearnRoute
   '/_app/quiz': typeof AppQuizRoute
+  '/_app/roadmap': typeof AppRoadmapRoute
   '/_app/settings': typeof AppSettingsRoute
   '/api/chalkboard': typeof ApiChalkboardRoute
   '/api/chat': typeof ApiChatRoute
   '/api/doodle-image': typeof ApiDoodleImageRoute
   '/api/roadmap': typeof ApiRoadmapRoute
+  '/api/roadmap-chapter': typeof ApiRoadmapChapterRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -132,11 +150,13 @@ export interface FileRouteTypes {
     | '/game'
     | '/learn'
     | '/quiz'
+    | '/roadmap'
     | '/settings'
     | '/api/chalkboard'
     | '/api/chat'
     | '/api/doodle-image'
     | '/api/roadmap'
+    | '/api/roadmap-chapter'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -145,11 +165,13 @@ export interface FileRouteTypes {
     | '/game'
     | '/learn'
     | '/quiz'
+    | '/roadmap'
     | '/settings'
     | '/api/chalkboard'
     | '/api/chat'
     | '/api/doodle-image'
     | '/api/roadmap'
+    | '/api/roadmap-chapter'
   id:
     | '__root__'
     | '/'
@@ -159,11 +181,13 @@ export interface FileRouteTypes {
     | '/_app/game'
     | '/_app/learn'
     | '/_app/quiz'
+    | '/_app/roadmap'
     | '/_app/settings'
     | '/api/chalkboard'
     | '/api/chat'
     | '/api/doodle-image'
     | '/api/roadmap'
+    | '/api/roadmap-chapter'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -174,6 +198,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiDoodleImageRoute: typeof ApiDoodleImageRoute
   ApiRoadmapRoute: typeof ApiRoadmapRoute
+  ApiRoadmapChapterRoute: typeof ApiRoadmapChapterRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -197,6 +222,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/roadmap-chapter': {
+      id: '/api/roadmap-chapter'
+      path: '/api/roadmap-chapter'
+      fullPath: '/api/roadmap-chapter'
+      preLoaderRoute: typeof ApiRoadmapChapterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/roadmap': {
@@ -232,6 +264,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/roadmap': {
+      id: '/_app/roadmap'
+      path: '/roadmap'
+      fullPath: '/roadmap'
+      preLoaderRoute: typeof AppRoadmapRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/quiz': {
@@ -270,6 +309,7 @@ interface AppRouteChildren {
   AppGameRoute: typeof AppGameRoute
   AppLearnRoute: typeof AppLearnRoute
   AppQuizRoute: typeof AppQuizRoute
+  AppRoadmapRoute: typeof AppRoadmapRoute
   AppSettingsRoute: typeof AppSettingsRoute
 }
 
@@ -278,6 +318,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppGameRoute: AppGameRoute,
   AppLearnRoute: AppLearnRoute,
   AppQuizRoute: AppQuizRoute,
+  AppRoadmapRoute: AppRoadmapRoute,
   AppSettingsRoute: AppSettingsRoute,
 }
 
@@ -291,6 +332,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiDoodleImageRoute: ApiDoodleImageRoute,
   ApiRoadmapRoute: ApiRoadmapRoute,
+  ApiRoadmapChapterRoute: ApiRoadmapChapterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
