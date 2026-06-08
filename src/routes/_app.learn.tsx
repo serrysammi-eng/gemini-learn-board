@@ -996,11 +996,8 @@ function DoodleBox({ line, topic }: { line: string; topic?: string }) {
   );
 }
 
-// Avoid importing react-dom/flushSync at module top to keep SSR happy.
 function flushSyncSafe(fn: () => void) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { flushSync } = require("react-dom");
     flushSync(fn);
   } catch {
     fn();
