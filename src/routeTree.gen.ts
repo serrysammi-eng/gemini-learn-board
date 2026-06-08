@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiRoadmapRouteImport } from './routes/api/roadmap'
 import { Route as ApiDoodleImageRouteImport } from './routes/api/doodle-image'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiChalkboardRouteImport } from './routes/api/chalkboard'
@@ -33,6 +34,11 @@ const AppRoute = AppRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRoadmapRoute = ApiRoadmapRouteImport.update({
+  id: '/api/roadmap',
+  path: '/api/roadmap',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDoodleImageRoute = ApiDoodleImageRouteImport.update({
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/api/chalkboard': typeof ApiChalkboardRoute
   '/api/chat': typeof ApiChatRoute
   '/api/doodle-image': typeof ApiDoodleImageRoute
+  '/api/roadmap': typeof ApiRoadmapRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/api/chalkboard': typeof ApiChalkboardRoute
   '/api/chat': typeof ApiChatRoute
   '/api/doodle-image': typeof ApiDoodleImageRoute
+  '/api/roadmap': typeof ApiRoadmapRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/api/chalkboard': typeof ApiChalkboardRoute
   '/api/chat': typeof ApiChatRoute
   '/api/doodle-image': typeof ApiDoodleImageRoute
+  '/api/roadmap': typeof ApiRoadmapRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/api/chalkboard'
     | '/api/chat'
     | '/api/doodle-image'
+    | '/api/roadmap'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/api/chalkboard'
     | '/api/chat'
     | '/api/doodle-image'
+    | '/api/roadmap'
   id:
     | '__root__'
     | '/'
@@ -152,6 +163,7 @@ export interface FileRouteTypes {
     | '/api/chalkboard'
     | '/api/chat'
     | '/api/doodle-image'
+    | '/api/roadmap'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -161,6 +173,7 @@ export interface RootRouteChildren {
   ApiChalkboardRoute: typeof ApiChalkboardRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiDoodleImageRoute: typeof ApiDoodleImageRoute
+  ApiRoadmapRoute: typeof ApiRoadmapRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -184,6 +197,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/roadmap': {
+      id: '/api/roadmap'
+      path: '/api/roadmap'
+      fullPath: '/api/roadmap'
+      preLoaderRoute: typeof ApiRoadmapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/doodle-image': {
@@ -270,6 +290,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChalkboardRoute: ApiChalkboardRoute,
   ApiChatRoute: ApiChatRoute,
   ApiDoodleImageRoute: ApiDoodleImageRoute,
+  ApiRoadmapRoute: ApiRoadmapRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
