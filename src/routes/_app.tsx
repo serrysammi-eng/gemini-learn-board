@@ -4,6 +4,7 @@ import {
   Brain,
   Gamepad2,
   Layers,
+  Map as MapIcon,
   Settings,
   Flame,
   Trophy,
@@ -12,6 +13,7 @@ import { useEffect, useState } from "react";
 
 import { AITutor } from "@/components/AITutor";
 import { cn } from "@/lib/utils";
+import { ensureRoadmap } from "@/lib/roadmap";
 import { getPrefs, getProgress } from "@/lib/storage";
 
 export const Route = createFileRoute("/_app")({
@@ -20,6 +22,7 @@ export const Route = createFileRoute("/_app")({
 
 const TABS = [
   { to: "/learn", label: "Learn", icon: BookOpen },
+  { to: "/roadmap", label: "Roadmap", icon: MapIcon },
   { to: "/quiz", label: "Quiz", icon: Brain },
   { to: "/flashcards", label: "Cards", icon: Layers },
   { to: "/game", label: "Game", icon: Gamepad2 },
@@ -30,7 +33,16 @@ function AppLayout() {
   const location = useLocation();
   const [tick, setTick] = useState(0);
   useEffect(() => {
-    if (!getPrefs()) navigate({ to: "/onboarding", replace: true });
+    const prefs = getPrefs();
+    if (!prefs) {
+      navigate({ to: "/onboarding", replace: true });
+      return;
+    }
+    // Kick off roadmap + image pre-generation in the background so the
+    // Roadmap tab feels instant when the user opens it. Fire-and-forget.
+    void ensureRoadmap(prefs).catch(() => {
+      /* network errors are surfaced inside the Roadmap page itself */
+    });
   }, [navigate]);
 
   // Re-render on focus to refresh XP/streak shown in header
