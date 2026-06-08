@@ -10,6 +10,7 @@ import {
   
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -437,10 +438,10 @@ function ChalkboardPage() {
                   style={{ width: 180, aspectRatio: "1 / 1" }}
                 >
                   <DoodleBox
-                    line={currentLine}
-                    title={lesson.title}
-                    highlights={lesson.highlights}
+                    line={currentLine || lesson.title || lesson.notes[0] || ""}
+                    topic={question || lesson.title}
                   />
+
                 </div>
                 <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-amber-400/25 bg-amber-500/[0.04] px-4 py-3">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400/80">
@@ -841,126 +842,166 @@ function ChatOnly({ text }: { text: string }) {
   );
 }
 
-/* ───────── Doodle box (top-left) ─────────
-   Re-draws a small hand-drawn chalk sketch whenever the spoken line changes.
-   Uses deterministic shapes seeded from the line's hash so each beat looks
-   different but stable while it's on screen. Stroke-dashoffset animates
-   the strokes left-to-right like a real chalkboard. */
-function DoodleBox({
-  line,
-  title,
-  highlights,
-}: {
-  line: string;
-  title: string;
-  highlights: string[];
-}) {
-  const seed = useMemo(() => {
-    let h = 5381;
-    const s = line || title || "x";
-    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-    return Math.abs(h);
-  }, [line, title]);
+/* ───────── AI Doodle box (top-left) ─────────
+   Streams an AI-generated chalk illustration for the current spoken line.
+   Partial frames render blurred (loading), final frame snaps sharp and gets
+   a slow Remotion-style ken-burns pan/zoom so it feels alive. Images are
+   cached per-line so repeats are instant. */
+const doodleCache = new Map<string, string>();
+const doodleInflight = new Map<string, Promise<string>>();
 
-  // Pick a couple of keywords to label the doodle
-  const label = useMemo(() => {
-    const src = line || highlights[0] || title || "";
-    const words = src
-      .split(/\s+/)
-      .map((w) => w.replace(/[^\p{L}\p{N}]+/gu, ""))
-      .filter((w) => w.length > 2);
-    return (words[0] || "idea").slice(0, 14);
-  }, [line, highlights, title]);
+async function fetchDoodleImage(
+  line: string,
+  topic: string | undefined,
+  signal: AbortSignal,
+  onPartial: (dataUrl: string) => void,
+): Promise<string> {
+  const key = line.trim().toLowerCase();
+  const cached = doodleCache.get(key);
+  if (cached) return cached;
+  const existing = doodleInflight.get(key);
+  if (existing) return existing;
 
-  // Deterministic pseudo-random helpers
-  const rand = (i: number) => {
-    const x = Math.sin(seed + i * 9301) * 43758.5453;
-    return x - Math.floor(x);
-  };
-
-  const shapes = useMemo(() => {
-    // pick 3 shape "kinds" varying by seed
-    const kinds = ["circle", "triangle", "wave", "arrow", "leaf", "spark"] as const;
-    return [0, 1, 2].map((i) => {
-      const k = kinds[Math.floor(rand(i + 1) * kinds.length)];
-      const cx = 30 + rand(i + 7) * 100;
-      const cy = 35 + rand(i + 13) * 80;
-      const size = 18 + rand(i + 19) * 22;
-      return { k, cx, cy, size, i };
+  const { createParser } = await import("eventsource-parser");
+  const promise = (async () => {
+    const res = await fetch("/api/doodle-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ line, topic }),
+      signal,
     });
-  }, [seed]);
+    if (!res.ok || !res.body) throw new Error("doodle failed");
+
+    let finalUrl = "";
+    const parser = createParser({
+      onEvent(ev) {
+        if (
+          ev.event !== "image_generation.partial_image" &&
+          ev.event !== "image_generation.completed"
+        )
+          return;
+        let p: { b64_json?: string };
+        try {
+          p = JSON.parse(ev.data);
+        } catch {
+          return;
+        }
+        if (!p.b64_json) return;
+        const url = `data:image/png;base64,${p.b64_json}`;
+        if (ev.event === "image_generation.completed") finalUrl = url;
+        else onPartial(url);
+      },
+    });
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      parser.feed(value);
+    }
+    if (finalUrl) doodleCache.set(key, finalUrl);
+    return finalUrl;
+  })();
+
+  doodleInflight.set(key, promise);
+  promise.finally(() => doodleInflight.delete(key));
+  return promise;
+}
+
+function DoodleBox({ line, topic }: { line: string; topic?: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [isFinal, setIsFinal] = useState(false);
+  const [animKey, setAnimKey] = useState(0);
+
+  // Debounce line changes so we don't fire a request per word boundary
+  useEffect(() => {
+    if (!line || line.trim().length < 4) return;
+    const cacheKey = line.trim().toLowerCase();
+    const cached = doodleCache.get(cacheKey);
+    if (cached) {
+      flushSyncSafe(() => {
+        setSrc(cached);
+        setIsFinal(true);
+        setAnimKey((k) => k + 1);
+      });
+      return;
+    }
+
+    const ctrl = new AbortController();
+    const t = setTimeout(() => {
+      setIsFinal(false);
+      setSrc(null);
+      fetchDoodleImage(line, topic, ctrl.signal, (partial) => {
+        flushSyncSafe(() => {
+          setSrc(partial);
+          setIsFinal(false);
+        });
+      })
+        .then((finalUrl) => {
+          if (ctrl.signal.aborted || !finalUrl) return;
+          flushSyncSafe(() => {
+            setSrc(finalUrl);
+            setIsFinal(true);
+            setAnimKey((k) => k + 1);
+          });
+        })
+        .catch(() => {});
+    }, 700);
+
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [line, topic]);
 
   return (
-    <svg
-      key={seed}
-      viewBox="0 0 180 180"
-      className="h-full w-full"
-      fill="none"
-      stroke="rgba(216,180,254,0.95)"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {/* dotted board grid */}
-      <defs>
-        <pattern id="dots" width="14" height="14" patternUnits="userSpaceOnUse">
-          <circle cx="1" cy="1" r="0.6" fill="rgba(167,139,250,0.18)" />
-        </pattern>
-      </defs>
-      <rect x="0" y="0" width="180" height="180" fill="url(#dots)" />
+    <div className="relative h-full w-full overflow-hidden bg-[#060d1a]">
+      {/* dotted board backdrop */}
+      <svg className="absolute inset-0 h-full w-full" aria-hidden>
+        <defs>
+          <pattern id="ddots" width="14" height="14" patternUnits="userSpaceOnUse">
+            <circle cx="1" cy="1" r="0.6" fill="rgba(167,139,250,0.18)" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#ddots)" />
+      </svg>
 
-      {shapes.map(({ k, cx, cy, size, i }) => {
-        const delay = i * 0.45;
-        const dash = 260;
-        const style = {
-          strokeDasharray: dash,
-          strokeDashoffset: dash,
-          animation: `doodle-draw 1.1s ease-out ${delay}s forwards`,
-        } as const;
-        if (k === "circle")
-          return <circle key={i} cx={cx} cy={cy} r={size} style={style} />;
-        if (k === "triangle") {
-          const p = `M ${cx} ${cy - size} L ${cx + size} ${cy + size} L ${cx - size} ${cy + size} Z`;
-          return <path key={i} d={p} style={style} />;
-        }
-        if (k === "wave") {
-          const p = `M ${cx - size} ${cy} Q ${cx - size / 2} ${cy - size}, ${cx} ${cy} T ${cx + size} ${cy}`;
-          return <path key={i} d={p} style={style} />;
-        }
-        if (k === "arrow") {
-          const p = `M ${cx - size} ${cy} L ${cx + size} ${cy} M ${cx + size - 6} ${cy - 5} L ${cx + size} ${cy} L ${cx + size - 6} ${cy + 5}`;
-          return <path key={i} d={p} style={style} />;
-        }
-        if (k === "leaf") {
-          const p = `M ${cx} ${cy - size} Q ${cx + size} ${cy}, ${cx} ${cy + size} Q ${cx - size} ${cy}, ${cx} ${cy - size} Z M ${cx} ${cy - size} L ${cx} ${cy + size}`;
-          return <path key={i} d={p} style={style} />;
-        }
-        // spark
-        const s = size * 0.7;
-        const p = `M ${cx - s} ${cy} L ${cx + s} ${cy} M ${cx} ${cy - s} L ${cx} ${cy + s} M ${cx - s * 0.7} ${cy - s * 0.7} L ${cx + s * 0.7} ${cy + s * 0.7} M ${cx + s * 0.7} ${cy - s * 0.7} L ${cx - s * 0.7} ${cy + s * 0.7}`;
-        return <path key={i} d={p} style={style} />;
-      })}
-
-      {/* handwritten label */}
-      <text
-        x="50%"
-        y="92%"
-        textAnchor="middle"
-        fontFamily="'Caveat', cursive"
-        fontSize="20"
-        fill="rgba(252,211,77,0.95)"
-        stroke="none"
-        style={{ opacity: 0, animation: "doodle-fade 0.6s ease-out 1.2s forwards" }}
-      >
-        {label}
-      </text>
+      {src ? (
+        <img
+          key={animKey}
+          src={src}
+          alt=""
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover transition-[filter,opacity] duration-500",
+            isFinal ? "doodle-kenburns" : "blur-xl opacity-80",
+          )}
+          style={{ mixBlendMode: "screen" }}
+        />
+      ) : (
+        <div className="absolute inset-0 grid place-items-center">
+          <div className="hand text-sm text-purple-300/70 animate-pulse">
+            Sketching…
+          </div>
+        </div>
+      )}
 
       <style>{`
-        @keyframes doodle-draw { to { stroke-dashoffset: 0; } }
-        @keyframes doodle-fade { to { opacity: 1; } }
+        @keyframes kenburns {
+          0%   { transform: scale(1.0) translate(0,0); }
+          50%  { transform: scale(1.08) translate(-2%, -1.5%); }
+          100% { transform: scale(1.0) translate(0,0); }
+        }
+        .doodle-kenburns { animation: kenburns 8s ease-in-out infinite; }
       `}</style>
-    </svg>
+    </div>
   );
+}
+
+function flushSyncSafe(fn: () => void) {
+  try {
+    flushSync(fn);
+  } catch {
+    fn();
+  }
 }
 
 
@@ -1206,10 +1247,17 @@ function BoardScene({
         ))}
       </div>
 
-      {/* Diagram */}
+      {/* Diagram — wrapped in its own scrollable card so it never overlaps notes/explanation */}
       {lesson.diagram && lesson.diagram.boxes.length > 0 && (
-        <div className="mt-6 fade-in">
-          <DiagramSVG diagram={lesson.diagram} />
+        <div className="mt-8 fade-in">
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-purple-400">
+            Concept map
+          </div>
+          <div className="overflow-x-auto rounded-2xl border border-purple-500/20 bg-black/30 p-4 shadow-[inset_0_0_30px_rgba(139,92,246,0.08)]">
+            <div className="mx-auto w-full max-w-2xl">
+              <DiagramSVG diagram={lesson.diagram} />
+            </div>
+          </div>
         </div>
       )}
 
