@@ -21,6 +21,12 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
+import {
+  doodleCache as sharedDoodleCache,
+  doodleKey,
+  fetchDoodleImage as sharedFetchDoodleImage,
+  instantDoodle,
+} from "@/lib/doodle-cache";
 import { getAISettings, getPrefs } from "@/lib/storage";
 
 export const Route = createFileRoute("/_app/learn")({
