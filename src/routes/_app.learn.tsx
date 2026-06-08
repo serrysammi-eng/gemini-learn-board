@@ -843,116 +843,47 @@ function ChatOnly({ text }: { text: string }) {
 }
 
 /* ───────── AI Doodle box (top-left) ─────────
-   Streams an AI-generated chalk illustration for the current spoken line.
-   Partial frames render blurred (loading), final frame snaps sharp and gets
-   a slow Remotion-style ken-burns pan/zoom so it feels alive. Images are
-   cached per-line so repeats are instant. */
-const doodleCache = new Map<string, string>();
-const doodleInflight = new Map<string, Promise<string>>();
-
-async function fetchDoodleImage(
-  line: string,
-  topic: string | undefined,
-  signal: AbortSignal,
-  onPartial: (dataUrl: string) => void,
-): Promise<string> {
-  const key = line.trim().toLowerCase();
-  const cached = doodleCache.get(key);
-  if (cached) return cached;
-  const existing = doodleInflight.get(key);
-  if (existing) return existing;
-
-  const { createParser } = await import("eventsource-parser");
-  const promise = (async () => {
-    const res = await fetch("/api/doodle-image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ line, topic }),
-      signal,
-    });
-    if (!res.ok || !res.body) throw new Error("doodle failed");
-
-    let finalUrl = "";
-    const parser = createParser({
-      onEvent(ev) {
-        if (
-          ev.event !== "image_generation.partial_image" &&
-          ev.event !== "image_generation.completed"
-        )
-          return;
-        let p: { b64_json?: string };
-        try {
-          p = JSON.parse(ev.data);
-        } catch {
-          return;
-        }
-        if (!p.b64_json) return;
-        const url = `data:image/png;base64,${p.b64_json}`;
-        if (ev.event === "image_generation.completed") finalUrl = url;
-        else onPartial(url);
-      },
-    });
-    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      parser.feed(value);
-    }
-    if (finalUrl) doodleCache.set(key, finalUrl);
-    return finalUrl;
-  })();
-
-  doodleInflight.set(key, promise);
-  promise.finally(() => doodleInflight.delete(key));
-  return promise;
-}
+   INSTANT: Pollinations.ai URL renders immediately (no fetch, no wait).
+   UPGRADE: Lovable AI image streams in behind it and replaces when ready.
+   Both are cached per-line so repeats are instant. */
+import {
+  doodleCache as sharedDoodleCache,
+  doodleKey,
+  fetchDoodleImage as sharedFetchDoodleImage,
+  instantDoodle,
+} from "@/lib/doodle-cache";
 
 function DoodleBox({ line, topic }: { line: string; topic?: string }) {
-  const [src, setSrc] = useState<string | null>(null);
-  const [isFinal, setIsFinal] = useState(false);
-  const [animKey, setAnimKey] = useState(0);
-
-  // Debounce line changes so we don't fire a request per word boundary
-  useEffect(() => {
-    if (!line || line.trim().length < 4) return;
-    const cacheKey = line.trim().toLowerCase();
-    const cached = doodleCache.get(cacheKey);
-    if (cached) {
-      flushSyncSafe(() => {
-        setSrc(cached);
-        setIsFinal(true);
-        setAnimKey((k) => k + 1);
-      });
-      return;
-    }
-
-    const ctrl = new AbortController();
-    const t = setTimeout(() => {
-      setIsFinal(false);
-      setSrc(null);
-      fetchDoodleImage(line, topic, ctrl.signal, (partial) => {
-        flushSyncSafe(() => {
-          setSrc(partial);
-          setIsFinal(false);
-        });
-      })
-        .then((finalUrl) => {
-          if (ctrl.signal.aborted || !finalUrl) return;
-          flushSyncSafe(() => {
-            setSrc(finalUrl);
-            setIsFinal(true);
-            setAnimKey((k) => k + 1);
-          });
-        })
-        .catch(() => {});
-    }, 700);
-
-    return () => {
-      clearTimeout(t);
-      ctrl.abort();
-    };
+  // Pollinations URL — instant, no fetch, just an <img src=…>.
+  const pollSrc = useMemo(() => {
+    if (!line || line.trim().length < 4) return null;
+    return instantDoodle(line, topic);
   }, [line, topic]);
 
+  // Lovable AI upgrade — streams in and replaces Pollinations when ready.
+  const [aiSrc, setAiSrc] = useState<string | null>(() =>
+    line ? sharedDoodleCache.get(doodleKey(line)) ?? null : null,
+  );
+
+  useEffect(() => {
+    if (!line || line.trim().length < 4) return;
+    const cached = sharedDoodleCache.get(doodleKey(line));
+    if (cached) {
+      flushSyncSafe(() => setAiSrc(cached));
+      return;
+    }
+    setAiSrc(null);
+    const ctrl = new AbortController();
+    sharedFetchDoodleImage(line, topic, ctrl.signal)
+      .then((finalUrl) => {
+        if (ctrl.signal.aborted || !finalUrl) return;
+        flushSyncSafe(() => setAiSrc(finalUrl));
+      })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [line, topic]);
+
+  const displaySrc = aiSrc || pollSrc;
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#060d1a]">
       {/* dotted board backdrop */}
@@ -965,16 +896,16 @@ function DoodleBox({ line, topic }: { line: string; topic?: string }) {
         <rect width="100%" height="100%" fill="url(#ddots)" />
       </svg>
 
-      {src ? (
+      {displaySrc ? (
         <img
-          key={animKey}
-          src={src}
+          key={displaySrc}
+          src={displaySrc}
           alt=""
-          className={cn(
-            "absolute inset-0 h-full w-full object-cover transition-[filter,opacity] duration-500",
-            isFinal ? "doodle-kenburns" : "blur-xl opacity-80",
-          )}
+          className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500 doodle-kenburns"
           style={{ mixBlendMode: "screen" }}
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
         />
       ) : (
         <div className="absolute inset-0 grid place-items-center">
