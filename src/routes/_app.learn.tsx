@@ -240,7 +240,10 @@ function parseLesson(raw: string): Lesson | null {
 }
 
 /* ───────── Page ───────── */
+type TabId = "lesson" | "formulas" | "tips" | "code" | "practice";
+
 function ChalkboardPage() {
+  const [tab, setTab] = useState<TabId>("lesson");
   const [settings, setSettings] = useState<ChalkSettings>(() => loadSettings());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -248,6 +251,15 @@ function ChalkboardPage() {
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [status, setStatus] = useState<"idle" | "generating" | "teaching" | "done">("idle");
   const [speaking, setSpeaking] = useState(false);
+
+  // Cancel any in-flight speech whenever the user leaves the Lesson tab.
+  useEffect(() => {
+    if (tab !== "lesson" && typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+    }
+  }, [tab]);
+
 
   // Currently spoken sentence (lifted up from BoardScene for the top doodle box)
   const [currentLine, setCurrentLine] = useState<string>("");
