@@ -204,6 +204,7 @@ function RoadmapPage() {
           total={chapters.length}
           topic={prefs.topic}
           language={prefs.language}
+          level={prefs.level}
           muted={muted}
           onToggleMute={() => setMuted((m) => !m)}
           onPrev={activeIdx > 0 ? goPrev : undefined}
