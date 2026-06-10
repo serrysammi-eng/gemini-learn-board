@@ -941,7 +941,7 @@ function DoodleBox({ line, topic }: { line: string; topic?: string }) {
           key={displaySrc}
           src={displaySrc}
           alt=""
-          className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500 doodle-kenburns-learn"
+          className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
           style={{ mixBlendMode: "screen" }}
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = "none";
