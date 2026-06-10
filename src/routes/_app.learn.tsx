@@ -862,7 +862,7 @@ function DoodleBox({ line, topic }: { line: string; topic?: string }) {
     return instantDoodle(line, topic);
   }, [line, topic]);
 
-  // Lovable AI upgrade — streams in and replaces Pollinations when ready.
+  // Lovable AI upgrade — streams in (partial frames included) and replaces Pollinations.
   const [aiSrc, setAiSrc] = useState<string | null>(() =>
     line ? sharedDoodleCache.get(doodleKey(line)) ?? null : null,
   );
@@ -876,7 +876,10 @@ function DoodleBox({ line, topic }: { line: string; topic?: string }) {
     }
     setAiSrc(null);
     const ctrl = new AbortController();
-    sharedFetchDoodleImage(line, topic, ctrl.signal)
+    sharedFetchDoodleImage(line, topic, ctrl.signal, (partialUrl) => {
+      if (ctrl.signal.aborted || !partialUrl) return;
+      flushSyncSafe(() => setAiSrc(partialUrl));
+    })
       .then((finalUrl) => {
         if (ctrl.signal.aborted || !finalUrl) return;
         flushSyncSafe(() => setAiSrc(finalUrl));
@@ -886,6 +889,7 @@ function DoodleBox({ line, topic }: { line: string; topic?: string }) {
   }, [line, topic]);
 
   const displaySrc = aiSrc || pollSrc;
+  const showSketching = !displaySrc && !!line && line.trim().length >= 4;
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#060d1a]">
       {/* dotted board backdrop */}
@@ -898,32 +902,36 @@ function DoodleBox({ line, topic }: { line: string; topic?: string }) {
         <rect width="100%" height="100%" fill="url(#ddots)" />
       </svg>
 
-      {displaySrc ? (
+      {displaySrc && (
         <img
           key={displaySrc}
           src={displaySrc}
           alt=""
-          className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500 doodle-kenburns"
+          className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500 doodle-kenburns-learn"
           style={{ mixBlendMode: "screen" }}
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
         />
-      ) : (
+      )}
+      {showSketching && (
         <div className="absolute inset-0 grid place-items-center">
-          <div className="hand text-sm text-purple-300/70 animate-pulse">
-            Sketching…
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-8 w-8 animate-pulse rounded-full bg-purple-500/30" />
+            <div className="hand text-sm text-purple-300/80 animate-pulse">
+              Sketching…
+            </div>
           </div>
         </div>
       )}
 
       <style>{`
-        @keyframes kenburns {
+        @keyframes kenburns-learn {
           0%   { transform: scale(1.0) translate(0,0); }
           50%  { transform: scale(1.08) translate(-2%, -1.5%); }
           100% { transform: scale(1.0) translate(0,0); }
         }
-        .doodle-kenburns { animation: kenburns 8s ease-in-out infinite; }
+        .doodle-kenburns-learn { animation: kenburns-learn 8s ease-in-out infinite; }
       `}</style>
     </div>
   );
