@@ -203,3 +203,112 @@ Return JSON: { "questions": [ { "q": "string", "choices": ["A","B","C","D"], "an
       system,
     );
   });
+
+// ----- FORMULAS -----
+export const generateFormulas = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => BaseSchema.parse(d))
+  .handler(async ({ data }) => {
+    const system = `You are a formula extractor. Output STRICT JSON only.`;
+    const prompt = `List all key formulas for the topic "${data.topic}" in subject "${data.subject}". For each formula give: formula (use unicode math symbols, not LaTeX), meaning (one sentence explaining variables), example (one concrete use case). Return JSON: { "cards": [{ "formula": "...", "meaning": "...", "example": "..." }] }. If this topic has no formulas, return { "cards": [] }.`;
+    return runJSON<{ cards: { formula: string; meaning: string; example: string }[] }>(
+      data,
+      prompt,
+      system,
+    );
+  });
+
+// ----- TIPS -----
+export const generateTips = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => BaseSchema.parse(d))
+  .handler(async ({ data }) => {
+    const system = `You are a memory coach. Output STRICT JSON only.`;
+    const prompt = `Give 6 memory tricks, mnemonics, or intuition-building tips for deeply understanding "${data.topic}" (${data.subject}). Make them clever and memorable — acronyms, visual metaphors, analogies to everyday life. Return JSON: { "tips": [{ "title": "...", "tip": "...", "emoji": "💡" }] }.`;
+    return runJSON<{ tips: { title: string; tip: string; emoji: string }[] }>(
+      data,
+      prompt,
+      system,
+    );
+  });
+
+// ----- STARTER CODE -----
+export const generateStarterCode = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => BaseSchema.parse(d))
+  .handler(async ({ data }) => {
+    const system = `You are a coding tutor. Output STRICT JSON only.`;
+    const prompt = `Write a short, clean beginner-friendly code snippet (max 20 lines) in Python demonstrating the concept "${data.topic}". Return JSON: { "language": "python", "code": "..." }.`;
+    return runJSON<{ language: string; code: string }>(data, prompt, system);
+  });
+
+// ----- PRACTICE PAPER -----
+const PaperSchema = BaseSchema.extend({
+  difficulty: z.enum(["easy", "medium", "hard"]),
+  count: z.number().int().min(1).max(50),
+  types: z.array(z.string()).min(1),
+});
+export const generatePracticePaper = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => PaperSchema.parse(d))
+  .handler(async ({ data }) => {
+    const system = `You are an exam paper generator. Output STRICT JSON only.`;
+    const prompt = `Generate a practice paper for topic "${data.topic}" (subject: ${data.subject}, level: ${data.level}). Difficulty: ${data.difficulty}. Include ${data.count} questions of types: ${data.types.join(", ")}. For MCQ include 4 choices and the correct answerIndex (0-3). For Short/Long answers include a model "answer" string. Return JSON: { "title": "...", "questions": [{ "id": "q1", "number": 1, "text": "...", "marks": 2, "type": "MCQ", "options": ["a","b","c","d"], "answerIndex": 0, "answer": "model answer for written types" }] }.`;
+    return runJSON<{
+      title: string;
+      questions: {
+        id: string;
+        number: number;
+        text: string;
+        marks: number;
+        type: string;
+        options?: string[];
+        answerIndex?: number;
+        answer?: string;
+      }[];
+    }>(data, prompt, system);
+  });
+
+// ----- EXTRACT PAPER FROM IMAGE (multimodal) -----
+const ExtractSchema = BaseSchema.partial({
+  subject: true,
+  level: true,
+  topic: true,
+  language: true,
+}).extend({
+  imageBase64: z.string().min(1),
+  mimeType: z.string().default("image/png"),
+});
+export const extractPaperFromImage = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => ExtractSchema.parse(d))
+  .handler(async ({ data }) => {
+    const usingGeminiDirect = isGeminiDirect(data.userApiKey);
+    const provider = getProvider(data.userApiKey);
+    const modelId = resolveModelId(data.model || "google/gemini-3-flash-preview", usingGeminiDirect);
+    const { text } = await generateText({
+      model: provider(modelId),
+      system: "You are a paper extractor. Output STRICT JSON only.",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `This image contains a past-year question paper or study material. Extract all questions and return JSON: { "title": "...", "questions": [{ "number": 1, "text": "...", "marks": 2, "type": "Short Answer", "options": [], "answer": "" }] }. Output JSON only, no prose.`,
+            },
+            {
+              type: "image",
+              image: `data:${data.mimeType};base64,${data.imageBase64}`,
+            },
+          ],
+        },
+      ],
+    });
+    return extractJson<{
+      title: string;
+      questions: {
+        number: number;
+        text: string;
+        marks: number;
+        type: string;
+        options?: string[];
+        answer?: string;
+      }[];
+    }>(text);
+  });
