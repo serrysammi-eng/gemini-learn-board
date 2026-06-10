@@ -274,6 +274,7 @@ function ChapterCard({
   total,
   topic,
   language,
+  level,
   muted,
   onToggleMute,
   onPrev,
@@ -284,6 +285,7 @@ function ChapterCard({
   total: number;
   topic?: string;
   language: "english" | "hindi" | "both";
+  level?: string;
   muted: boolean;
   onToggleMute: () => void;
   onPrev?: () => void;
@@ -297,6 +299,19 @@ function ChapterCard({
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    const cacheKey = `studymate.chapter.v1:${chapter.id}:${language}:${level || "default"}`;
+    // Instant load from cache if available
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached) as ChapterContent;
+        setContent(parsed);
+        setLoading(false);
+        return () => ctrl.abort();
+      }
+    } catch {
+      /* noop */
+    }
     setContent(null);
     setLoading(true);
     (async () => {
@@ -310,6 +325,7 @@ function ChapterCard({
             summary: chapter.summary,
             topic,
             language,
+            level,
           }),
         });
         if (!res.ok || !res.body) throw new Error("chapter failed");
@@ -324,6 +340,13 @@ function ChapterCard({
         if (ctrl.signal.aborted) return;
         const parsed = parseChapterContent(buf);
         setContent(parsed);
+        if (parsed) {
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(parsed));
+          } catch {
+            /* quota */
+          }
+        }
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
         console.error(e);
@@ -332,7 +355,7 @@ function ChapterCard({
       }
     })();
     return () => ctrl.abort();
-  }, [chapter.id, chapter.title, chapter.summary, topic, language]);
+  }, [chapter.id, chapter.title, chapter.summary, topic, language, level]);
 
   return (
     <div className="overflow-hidden rounded-3xl border border-purple-500/20 bg-gradient-to-b from-[#0a1628] to-[#060d1a] shadow-[0_4px_30px_rgba(0,0,0,0.4)]">
