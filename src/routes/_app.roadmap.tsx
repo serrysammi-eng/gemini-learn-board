@@ -429,22 +429,13 @@ function ChapterVisual({ line, topic }: { line: string; topic?: string }) {
       <img
         src={finalSrc}
         alt=""
-        className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500 doodle-kenburns"
+        className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500"
         style={{ mixBlendMode: "screen", opacity: 0.95 }}
         onError={(e) => {
-          // If pollinations URL fails, hide the image
           (e.currentTarget as HTMLImageElement).style.display = "none";
         }}
       />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0a1628] to-transparent" />
-      <style>{`
-        @keyframes kenburns-r {
-          0% { transform: scale(1) translate(0,0); }
-          50% { transform: scale(1.08) translate(-2%, -1.5%); }
-          100% { transform: scale(1) translate(0,0); }
-        }
-        .doodle-kenburns { animation: kenburns-r 10s ease-in-out infinite; }
-      `}</style>
     </div>
   );
 }
