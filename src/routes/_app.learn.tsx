@@ -1,13 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
+  BookOpen,
+  Calculator,
+  Check,
+  Code2,
+  Copy,
+  FileText,
+  Lightbulb,
+  Loader2,
   Paperclip,
   Send,
   Settings2,
   Sparkles,
   Square,
+  Upload,
   Volume2,
   VolumeX,
-  
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -27,6 +35,13 @@ import {
   fetchDoodleImage as sharedFetchDoodleImage,
   instantDoodle,
 } from "@/lib/doodle-cache";
+import {
+  extractPaperFromImage,
+  generateFormulas,
+  generatePracticePaper,
+  generateStarterCode,
+  generateTips,
+} from "@/lib/ai.functions";
 import { getAISettings, getPrefs } from "@/lib/storage";
 
 export const Route = createFileRoute("/_app/learn")({
