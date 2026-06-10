@@ -1465,3 +1465,710 @@ function Visualizer({ active }: { active: boolean }) {
     </div>
   );
 }
+
+/* ═══════════ Tab bar ═══════════ */
+const TAB_DEFS: { id: TabId; label: string; icon: typeof BookOpen; emoji: string }[] = [
+  { id: "lesson", label: "Lesson", icon: BookOpen, emoji: "📖" },
+  { id: "formulas", label: "Formulas", icon: Calculator, emoji: "🧮" },
+  { id: "tips", label: "Tips", icon: Lightbulb, emoji: "💡" },
+  { id: "code", label: "Code", icon: Code2, emoji: "💻" },
+  { id: "practice", label: "Practice", icon: FileText, emoji: "📝" },
+];
+
+function TabBar({ tab, onChange }: { tab: TabId; onChange: (t: TabId) => void }) {
+  return (
+    <div className="mx-auto flex max-w-2xl gap-1 overflow-x-auto rounded-full border border-purple-500/15 bg-white/[0.03] p-1 backdrop-blur-xl">
+      {TAB_DEFS.map((t) => {
+        const active = tab === t.id;
+        return (
+          <button
+            key={t.id}
+            onClick={() => onChange(t.id)}
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all sm:px-4 sm:text-sm",
+              active
+                ? "bg-gradient-to-r from-purple-600 to-purple-400 text-white shadow-[0_0_15px_rgba(139,92,246,0.4)]"
+                : "text-slate-400 hover:text-slate-200",
+            )}
+            aria-pressed={active}
+          >
+            <span className="text-base leading-none">{t.emoji}</span>
+            <span className="hidden sm:inline">{t.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ═══════════ Shared helpers for new tabs ═══════════ */
+function usePrefsOrNull() {
+  return useMemo(() => getPrefs(), []);
+}
+function aiBase() {
+  const ai = getAISettings();
+  const prefs = getPrefs();
+  return {
+    model: ai.model,
+    userApiKey: ai.geminiApiKey,
+    name: prefs?.name || "learner",
+    language: (prefs?.language as "english" | "hindi" | "both") || "english",
+    subject: prefs?.subject || "science",
+    level: prefs?.level || "high_school",
+    topic: prefs?.topic || "everything",
+  };
+}
+
+/* ═══════════ Formulas tab ═══════════ */
+interface FormulaCard {
+  formula: string;
+  meaning: string;
+  example: string;
+}
+function FormulasTab() {
+  const prefs = usePrefsOrNull();
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [cards, setCards] = useState<FormulaCard[]>([]);
+  const [copied, setCopied] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!prefs) return;
+    const key = `studymate.formulas.v1:${prefs.subject}:${prefs.topic || "everything"}`;
+    try {
+      const cached = localStorage.getItem(key);
+      if (cached) {
+        setCards(JSON.parse(cached));
+        setStatus("done");
+        return;
+      }
+    } catch {
+      /* noop */
+    }
+    setStatus("loading");
+    generateFormulas({ data: aiBase() })
+      .then((r) => {
+        setCards(r.cards || []);
+        setStatus("done");
+        try {
+          localStorage.setItem(key, JSON.stringify(r.cards || []));
+        } catch {
+          /* noop */
+        }
+      })
+      .catch(() => setStatus("error"));
+  }, [prefs]);
+
+  const copy = (text: string, i: number) => {
+    void navigator.clipboard.writeText(text);
+    setCopied(i);
+    setTimeout(() => setCopied(null), 1200);
+  };
+
+  return (
+    <div className="h-full overflow-y-auto rounded-3xl border border-purple-500/15 bg-white/[0.02] p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Calculator className="h-4 w-4 text-amber-400" />
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-amber-400">
+          Formula Sheet
+        </h2>
+      </div>
+      {status === "loading" && <SkeletonGrid />}
+      {status === "error" && (
+        <p className="text-sm text-red-300">Couldn't generate formulas. Try again later.</p>
+      )}
+      {status === "done" && cards.length === 0 && (
+        <p className="text-sm text-slate-400">
+          No formulas found for this topic — try a math or science subject.
+        </p>
+      )}
+      {status === "done" && cards.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {cards.map((c, i) => (
+            <div
+              key={i}
+              className="relative rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] p-4 animate-[fadeSlideUp_0.4s_ease-out_forwards]"
+              style={{ animationDelay: `${i * 60}ms`, opacity: 0 }}
+            >
+              <button
+                onClick={() => copy(c.formula, i)}
+                className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-amber-300"
+                aria-label="Copy formula"
+              >
+                {copied === i ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+              <div className="pr-8 font-mono text-2xl font-bold text-amber-300">{c.formula}</div>
+              <div className="mt-2 text-sm text-slate-300">{c.meaning}</div>
+              <div className="mt-1 text-xs italic text-slate-500">{c.example}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SkeletonGrid() {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className="h-28 animate-pulse rounded-2xl border border-white/[0.04] bg-white/[0.02]"
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ═══════════ Tips tab ═══════════ */
+interface TipCard {
+  title: string;
+  tip: string;
+  emoji: string;
+}
+function TipsTab() {
+  const prefs = usePrefsOrNull();
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [tips, setTips] = useState<TipCard[]>([]);
+
+  useEffect(() => {
+    if (!prefs) return;
+    const key = `studymate.tips.v1:${prefs.subject}:${prefs.topic || "everything"}`;
+    try {
+      const cached = localStorage.getItem(key);
+      if (cached) {
+        setTips(JSON.parse(cached));
+        setStatus("done");
+        return;
+      }
+    } catch {
+      /* noop */
+    }
+    setStatus("loading");
+    generateTips({ data: aiBase() })
+      .then((r) => {
+        setTips(r.tips || []);
+        setStatus("done");
+        try {
+          localStorage.setItem(key, JSON.stringify(r.tips || []));
+        } catch {
+          /* noop */
+        }
+      })
+      .catch(() => setStatus("error"));
+  }, [prefs]);
+
+  return (
+    <div className="h-full overflow-y-auto rounded-3xl border border-purple-500/15 bg-white/[0.02] p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Lightbulb className="h-4 w-4 text-purple-300" />
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-purple-300">
+          Tips & Tricks
+        </h2>
+      </div>
+      {status === "loading" && (
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <Loader2 className="h-4 w-4 animate-spin" /> Cooking up clever tricks…
+        </div>
+      )}
+      {status === "error" && (
+        <p className="text-sm text-red-300">Couldn't generate tips. Try again later.</p>
+      )}
+      {status === "done" && (
+        <div className="space-y-3">
+          {tips.map((t, i) => (
+            <div
+              key={i}
+              className="flex items-start gap-3 rounded-2xl border border-purple-500/15 bg-white/[0.03] p-4 animate-[fadeSlideUp_0.4s_ease-out_forwards]"
+              style={{ animationDelay: `${i * 80}ms`, opacity: 0 }}
+            >
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-purple-500/20 text-xl">
+                {t.emoji || "💡"}
+              </div>
+              <div className="min-w-0">
+                <div className="font-bold text-slate-100">{t.title}</div>
+                <div className="mt-1 text-sm leading-relaxed text-slate-300">{t.tip}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════ Code Sandbox tab ═══════════ */
+function CodeTab() {
+  const prefs = usePrefsOrNull();
+  const isTech = prefs?.subject === "technology";
+  const [code, setCode] = useState("");
+  const [output, setOutput] = useState("");
+  const [running, setRunning] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!isTech || loaded) return;
+    setLoaded(true);
+    generateStarterCode({ data: aiBase() })
+      .then((r) => setCode(r.code || "# start coding here\n"))
+      .catch(() => setCode("# couldn't load a starter snippet\n"));
+  }, [isTech, loaded]);
+
+  const callAI = async (instruction: string) => {
+    setRunning(true);
+    setOutput("");
+    try {
+      const ai = getAISettings();
+      const res = await fetch("/api/chalkboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `${instruction}\n\nCode:\n\`\`\`\n${code}\n\`\`\``,
+          language: prefs?.language || "english",
+          mode: "direct",
+          model: ai.model,
+          userApiKey: ai.geminiApiKey,
+          isCalculation: true,
+        }),
+      });
+      if (!res.ok || !res.body) throw new Error("ai failed");
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        setOutput(buf.replace(/^EXPLANATION:\s*/im, "").replace(/\nEND\s*$/i, ""));
+      }
+    } catch {
+      setOutput("Couldn't reach the AI. Try again.");
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  if (!isTech) {
+    return (
+      <div className="grid h-full place-items-center rounded-3xl border border-purple-500/15 bg-white/[0.02] p-6 text-center">
+        <div>
+          <Code2 className="mx-auto h-10 w-10 text-purple-400/60" />
+          <p className="mt-3 text-sm text-slate-300">
+            Code Sandbox is available for <b>Technology</b> topics.
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Go to Settings to switch your subject.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full flex-col gap-3 overflow-y-auto rounded-3xl border border-purple-500/15 bg-white/[0.02] p-4">
+      <div className="flex items-center gap-2">
+        <Code2 className="h-4 w-4 text-emerald-300" />
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-300">
+          Code Sandbox
+        </h2>
+      </div>
+      <textarea
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        rows={14}
+        spellCheck={false}
+        className="w-full resize-none rounded-2xl border border-purple-500/20 bg-[#0d1b2e] p-4 font-mono text-sm leading-relaxed text-emerald-300 focus:border-purple-400/40 focus:outline-none"
+        placeholder="# starter code will appear here…"
+      />
+      <div className="flex gap-2">
+        <Button
+          onClick={() => callAI("Review this code snippet and explain what it does, any bugs, and one improvement suggestion. Be brief and friendly.")}
+          disabled={running || !code.trim()}
+          className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:opacity-95"
+        >
+          ▶ AI Review
+        </Button>
+        <Button
+          onClick={() => callAI("Give one short helpful hint for improving or continuing this code. One sentence only.")}
+          disabled={running || !code.trim()}
+          variant="outline"
+          className="flex-1 border-purple-500/30 bg-white/[0.04] text-slate-200 hover:bg-white/10"
+        >
+          💡 Get Hint
+        </Button>
+      </div>
+      <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.03] p-4">
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400">
+          AI Code Review
+        </div>
+        <div className="mt-2 min-h-[80px] whitespace-pre-wrap font-mono text-sm text-emerald-200">
+          {output || (running ? "…" : "Run AI Review to see feedback.")}
+          {running && <span className="ml-1 inline-block h-3 w-1.5 animate-pulse bg-emerald-300" />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════ Practice Paper tab ═══════════ */
+interface PaperQuestion {
+  id?: string;
+  number: number;
+  text: string;
+  marks: number;
+  type: string;
+  options?: string[];
+  answerIndex?: number;
+  answer?: string;
+}
+function PracticeTab() {
+  const prefs = usePrefsOrNull();
+  const [mode, setMode] = useState<"generate" | "upload">("generate");
+  const [topic, setTopic] = useState(prefs?.topic || "");
+  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+  const [count, setCount] = useState<5 | 10 | 15>(10);
+  const [types, setTypes] = useState<string[]>(["MCQ"]);
+  const [loading, setLoading] = useState(false);
+  const [paper, setPaper] = useState<{ title: string; questions: PaperQuestion[] } | null>(null);
+  const [answers, setAnswers] = useState<Record<string, number | string>>({});
+  const [revealed, setRevealed] = useState(false);
+
+  const toggleType = (t: string) =>
+    setTypes((cur) =>
+      cur.includes(t) ? (cur.length > 1 ? cur.filter((x) => x !== t) : cur) : [...cur, t],
+    );
+
+  const generate = async () => {
+    if (!prefs) return;
+    setLoading(true);
+    setPaper(null);
+    setAnswers({});
+    setRevealed(false);
+    try {
+      const r = await generatePracticePaper({
+        data: { ...aiBase(), topic: topic || prefs.topic, difficulty, count, types },
+      });
+      setPaper(r);
+    } catch {
+      setPaper({ title: "Error", questions: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onUpload = async (file: File) => {
+    const isImage = file.type.startsWith("image/");
+    if (!isImage) {
+      alert("PDFs aren't supported yet — please upload a clear photo or screenshot of the paper.");
+      return;
+    }
+    setLoading(true);
+    setPaper(null);
+    setAnswers({});
+    setRevealed(false);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => {
+          const r = String(fr.result || "");
+          resolve(r.split(",")[1] || "");
+        };
+        fr.onerror = () => reject(fr.error);
+        fr.readAsDataURL(file);
+      });
+      const r = await extractPaperFromImage({
+        data: { ...aiBase(), imageBase64: base64, mimeType: file.type },
+      });
+      setPaper({
+        title: r.title,
+        questions: r.questions.map((q, i) => ({ ...q, id: `q${i + 1}` })),
+      });
+    } catch {
+      setPaper({ title: "Couldn't read your paper", questions: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="h-full overflow-y-auto rounded-3xl border border-purple-500/15 bg-white/[0.02] p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-purple-300" />
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-purple-300">
+            Practice Paper
+          </h2>
+        </div>
+        <div className="flex gap-1 rounded-full border border-white/[0.06] bg-white/[0.03] p-0.5 text-xs">
+          {(["generate", "upload"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={cn(
+                "rounded-full px-3 py-1 transition",
+                mode === m
+                  ? "bg-gradient-to-r from-purple-600 to-purple-400 text-white"
+                  : "text-slate-400 hover:text-slate-200",
+              )}
+            >
+              {m === "generate" ? "Generate" : "Upload"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!paper && mode === "generate" && (
+        <div className="space-y-4 rounded-2xl border border-purple-500/15 bg-white/[0.03] p-5">
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Topic
+            </label>
+            <input
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-purple-500/15 bg-white/[0.04] px-3 py-2 text-sm text-slate-100 focus:border-purple-400/40 focus:outline-none"
+              placeholder="e.g. Photosynthesis"
+            />
+          </div>
+          <PillRow
+            label="Difficulty"
+            options={["easy", "medium", "hard"]}
+            value={difficulty}
+            onChange={(v) => setDifficulty(v as "easy" | "medium" | "hard")}
+          />
+          <PillRow
+            label="Questions"
+            options={["5", "10", "15"]}
+            value={String(count)}
+            onChange={(v) => setCount(Number(v) as 5 | 10 | 15)}
+          />
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Types (pick at least one)
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {["MCQ", "Short Answer", "Long Answer"].map((t) => {
+                const on = types.includes(t);
+                return (
+                  <button
+                    key={t}
+                    onClick={() => toggleType(t)}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-xs transition",
+                      on
+                        ? "border-purple-400/40 bg-purple-500/20 text-purple-100"
+                        : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:text-slate-200",
+                    )}
+                  >
+                    {t}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <Button
+            onClick={generate}
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-purple-600 to-purple-400 text-white shadow-[0_0_15px_rgba(139,92,246,0.4)] hover:opacity-95"
+          >
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Generate Paper ✨
+          </Button>
+        </div>
+      )}
+
+      {!paper && mode === "upload" && (
+        <UploadZone loading={loading} onFile={onUpload} />
+      )}
+
+      {paper && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="hand text-2xl text-amber-300">{paper.title || "Practice Paper"}</div>
+              <div className="text-xs text-slate-500">
+                {paper.questions.length} questions · {difficulty}
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPaper(null);
+                setAnswers({});
+                setRevealed(false);
+              }}
+              className="border-purple-500/30 bg-white/[0.04] text-slate-200 hover:bg-white/10"
+            >
+              New
+            </Button>
+          </div>
+          {paper.questions.map((q, i) => {
+            const qid = q.id || `q${i + 1}`;
+            return (
+              <div
+                key={qid}
+                className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-4 animate-[fadeSlideUp_0.3s_ease-out_forwards]"
+                style={{ animationDelay: `${i * 40}ms`, opacity: 0 }}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-3">
+                    <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-purple-500/20 text-xs font-bold text-purple-200">
+                      {q.number || i + 1}
+                    </div>
+                    <div className="text-sm text-slate-100">{q.text}</div>
+                  </div>
+                  <div className="shrink-0 text-xs font-semibold text-amber-300">
+                    {q.marks ? `[${q.marks}]` : ""}
+                  </div>
+                </div>
+                {q.type === "MCQ" && q.options && (
+                  <div className="mt-3 grid gap-2 pl-10">
+                    {q.options.map((opt, oi) => {
+                      const selected = answers[qid] === oi;
+                      const correct = revealed && q.answerIndex === oi;
+                      const wrong = revealed && selected && q.answerIndex !== oi;
+                      return (
+                        <button
+                          key={oi}
+                          onClick={() => !revealed && setAnswers({ ...answers, [qid]: oi })}
+                          className={cn(
+                            "rounded-xl border px-3 py-2 text-left text-sm transition",
+                            correct
+                              ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-100"
+                              : wrong
+                                ? "border-red-400/60 bg-red-500/20 text-red-100"
+                                : selected
+                                  ? "border-purple-400/40 bg-purple-500/20 text-purple-100"
+                                  : "border-white/[0.06] bg-white/[0.03] text-slate-300 hover:border-purple-500/30",
+                          )}
+                        >
+                          {String.fromCharCode(65 + oi)}. {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {q.type !== "MCQ" && (
+                  <div className="mt-3 pl-10">
+                    <textarea
+                      value={(answers[qid] as string) || ""}
+                      onChange={(e) => setAnswers({ ...answers, [qid]: e.target.value })}
+                      rows={3}
+                      className="w-full resize-none rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-sm text-slate-100 focus:border-purple-400/40 focus:outline-none"
+                      placeholder="Write your answer…"
+                    />
+                    {revealed && q.answer && (
+                      <div className="mt-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] p-3 text-xs text-emerald-100">
+                        <div className="mb-1 font-bold text-emerald-300">Model answer</div>
+                        {q.answer}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {paper.questions.length > 0 && (
+            <div className="sticky bottom-0 bg-gradient-to-t from-[#060d1a] to-transparent pb-2 pt-3">
+              <Button
+                onClick={() => setRevealed((r) => !r)}
+                className="w-full bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-[0_0_15px_rgba(245,158,11,0.3)] hover:opacity-95"
+              >
+                {revealed ? "Hide Answers" : "Check Answers"}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PillRow({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        {label}
+      </div>
+      <div className="flex gap-2">
+        {options.map((o) => (
+          <button
+            key={o}
+            onClick={() => onChange(o)}
+            className={cn(
+              "flex-1 rounded-full border px-3 py-1.5 text-xs capitalize transition",
+              value === o
+                ? "border-purple-400/40 bg-purple-500/20 text-purple-100"
+                : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:text-slate-200",
+            )}
+          >
+            {o}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function UploadZone({
+  loading,
+  onFile,
+}: {
+  loading: boolean;
+  onFile: (f: File) => void;
+}) {
+  const [drag, setDrag] = useState(false);
+  return (
+    <label
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDrag(true);
+      }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDrag(false);
+        const f = e.dataTransfer.files?.[0];
+        if (f) onFile(f);
+      }}
+      className={cn(
+        "block cursor-pointer rounded-2xl border-2 border-dashed p-10 text-center transition",
+        drag
+          ? "border-purple-400/60 bg-purple-500/[0.08]"
+          : "border-purple-500/30 bg-purple-500/[0.03] hover:bg-purple-500/[0.06]",
+      )}
+    >
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onFile(f);
+          e.target.value = "";
+        }}
+      />
+      {loading ? (
+        <div className="flex flex-col items-center gap-2 text-slate-300">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <div className="text-sm">Reading your paper…</div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-2 text-slate-300">
+          <Upload className="h-8 w-8 text-purple-300" />
+          <div className="text-sm">Drop an image of your question paper</div>
+          <div className="text-xs text-slate-500">PNG, JPG, or screenshot</div>
+        </div>
+      )}
+    </label>
+  );
+}
