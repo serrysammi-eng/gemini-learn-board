@@ -451,168 +451,175 @@ function ChalkboardPage() {
         }}
       />
 
-      <div className="relative flex-1 px-3 pb-2 pt-2">
-        <div className="chalkboard relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-purple-500/15 shadow-[inset_0_0_120px_rgba(0,0,0,0.6)]">
-          <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-purple-500/10" />
+      {/* Tab bar */}
+      <div className="px-3 pt-2">
+        <TabBar tab={tab} onChange={setTab} />
+      </div>
 
-          {/* Top doodle + current spoken line */}
-          {!!lesson && !lesson.chat && (
-            <div
-              className="relative z-10 shrink-0 border-b border-purple-500/15 bg-black/30 px-3 py-2 animate-fade-in"
-              style={{ maxHeight: "38%" }}
-            >
-              <div className="mb-1.5 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-purple-400">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
-                Now teaching
-              </div>
-              <div className="flex items-stretch gap-3">
-                <div
-                  className="relative shrink-0 overflow-hidden rounded-xl border border-purple-500/20 bg-[#060d1a] shadow-[inset_0_0_30px_rgba(139,92,246,0.15)]"
-                  style={{ width: 180, aspectRatio: "1 / 1" }}
-                >
+      {/* Tab content */}
+      <div className="relative flex-1 overflow-hidden px-3 pb-2 pt-2">
+        {tab === "lesson" && (
+          <div className="chalkboard relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-purple-500/15 shadow-[inset_0_0_120px_rgba(0,0,0,0.6)]">
+            <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-purple-500/10" />
+
+            {/* 16:9 doodle banner on top */}
+            {!!lesson && !lesson.chat && (
+              <div className="relative z-10 shrink-0 border-b border-purple-500/15 bg-black/30 animate-fade-in">
+                <div className="relative aspect-video w-full overflow-hidden">
                   <DoodleBox
                     line={currentLine || lesson.title || lesson.notes[0] || ""}
                     topic={question || lesson.title}
                   />
+                  {/* Now teaching badge */}
+                  <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-purple-200 backdrop-blur">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
+                    Now teaching
+                  </div>
+                  {/* Spoken line overlay */}
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-3">
+                    <div
+                      key={currentLine}
+                      className="hand text-lg leading-snug text-amber-100 sm:text-xl animate-[fadeSlideUp_0.35s_ease-out_forwards]"
+                      style={{ textShadow: "0 2px 10px rgba(0,0,0,0.8), 0 0 10px rgba(245,158,11,0.3)" }}
+                    >
+                      {currentLine || lesson.title || "Listen as I draw it out…"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
+            <div className="relative flex-1 overflow-hidden">
+              {!lesson ? (
+                <EmptyState busy={status === "generating"} />
+              ) : lesson.chat ? (
+                <ChatOnly text={lesson.chat} />
+              ) : (
+                <BoardScene
+                  lesson={lesson}
+                  settings={settings}
+                  onSpeakingChange={setSpeaking}
+                  onFinished={onLessonFinished}
+                  onLineChange={setCurrentLine}
+                />
+              )}
+
+              {isBusy && (
+                <div className="pointer-events-none absolute left-4 top-4 z-20 flex items-center gap-2 rounded-full border border-purple-500/20 bg-black/40 px-3 py-1 text-[11px] font-medium text-purple-200 backdrop-blur">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-purple-400 opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-purple-300" />
+                  </span>
+                  {status === "generating"
+                    ? doubtLayerRef.current
+                      ? `Re-teaching (try ${doubtLayerRef.current})…`
+                      : "Thinking…"
+                    : `Teaching ${question?.slice(0, 28) || "now"}…`}
                 </div>
-                <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-amber-400/25 bg-amber-500/[0.04] px-4 py-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400/80">
-                    Line {currentLine ? "" : "1"}
-                  </div>
-                  <div
-                    key={currentLine}
-                    className="hand mt-1 text-xl leading-snug text-amber-100 sm:text-2xl animate-[fadeSlideUp_0.35s_ease-out_forwards]"
-                    style={{ textShadow: "0 0 10px rgba(245,158,11,0.3)" }}
-                  >
-                    {currentLine || lesson.title || "Listen as I draw it out…"}
-                  </div>
-                </div>
+              )}
+
+              <Visualizer active={speaking} />
+            </div>
+          </div>
+        )}
+
+        {tab === "formulas" && <FormulasTab />}
+        {tab === "tips" && <TipsTab />}
+        {tab === "code" && <CodeTab />}
+        {tab === "practice" && <PracticeTab />}
+      </div>
+
+      {/* Input bar — only on Lesson tab */}
+      {tab === "lesson" && (
+        <div className="px-3 pb-4 pt-2">
+          {question && (
+            <div className="mx-auto mb-2 flex max-w-xl justify-end">
+              <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-gradient-to-r from-purple-600 to-purple-400 px-3.5 py-2 text-sm text-white shadow-[0_0_15px_rgba(139,92,246,0.3)] animate-[fadeSlideUp_0.3s_ease-out_forwards]">
+                {question}
               </div>
             </div>
           )}
 
-          <div className="relative flex-1 overflow-hidden">
-            {!lesson ? (
-              <EmptyState busy={status === "generating"} />
-            ) : lesson.chat ? (
-              <ChatOnly text={lesson.chat} />
-            ) : (
-              <BoardScene
-                lesson={lesson}
-                settings={settings}
-                onSpeakingChange={setSpeaking}
-                onFinished={onLessonFinished}
-                onLineChange={setCurrentLine}
+          <div className="mx-auto flex max-w-xl items-end gap-2 rounded-3xl border border-purple-500/20 bg-white/[0.04] p-2 shadow-[0_4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl focus-within:border-purple-500/40 transition-all">
+            <label
+              className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-white/10"
+              aria-label="Attach image"
+            >
+              <Paperclip className="h-4 w-4" />
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f)
+                    setInput((cur) =>
+                      cur ? cur + ` (image: ${f.name})` : `Help me with this image: ${f.name}`,
+                    );
+                  e.target.value = "";
+                }}
               />
-            )}
-
-            {isBusy && (
-              <div className="pointer-events-none absolute left-4 top-4 z-20 flex items-center gap-2 rounded-full border border-purple-500/20 bg-black/40 px-3 py-1 text-[11px] font-medium text-purple-200 backdrop-blur">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-purple-400 opacity-75" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-purple-300" />
-                </span>
-                {status === "generating"
-                  ? doubtLayerRef.current
-                    ? `Re-teaching (try ${doubtLayerRef.current})…`
-                    : "Thinking…"
-                  : `Teaching ${question?.slice(0, 28) || "now"}…`}
-              </div>
-            )}
-
-            <Visualizer active={speaking} />
-          </div>
-        </div>
-      </div>
-
-      <div className="px-3 pb-4 pt-2">
-        {question && (
-          <div className="mx-auto mb-2 flex max-w-xl justify-end">
-            <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-gradient-to-r from-purple-600 to-purple-400 px-3.5 py-2 text-sm text-white shadow-[0_0_15px_rgba(139,92,246,0.3)] animate-[fadeSlideUp_0.3s_ease-out_forwards]">
-              {question}
-            </div>
-          </div>
-        )}
-
-        <div className="mx-auto flex max-w-xl items-end gap-2 rounded-3xl border border-purple-500/20 bg-white/[0.04] p-2 shadow-[0_4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl focus-within:border-purple-500/40 transition-all">
-          <label
-            className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-white/10"
-            aria-label="Attach image"
-          >
-            <Paperclip className="h-4 w-4" />
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f)
-                  setInput((cur) =>
-                    cur ? cur + ` (image: ${f.name})` : `Help me with this image: ${f.name}`,
-                  );
-                e.target.value = "";
+            </label>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submit();
+                }
               }}
-            />
-          </label>
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                submit();
+              placeholder={
+                settings.mode === "tutor"
+                  ? "Ask anything — I'll teach you step by step…"
+                  : "Ask a question…"
               }
-            }}
-            placeholder={
-              settings.mode === "tutor"
-                ? "Ask anything — I'll teach you step by step…"
-                : "Ask a question…"
-            }
-            rows={1}
-            className="flex-1 resize-none bg-transparent px-2 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
-          />
-          {isBusy ? (
-            <Button
-              onClick={stop}
-              size="icon"
-              className="h-10 w-10 shrink-0 rounded-full bg-red-500/90 hover:bg-red-600"
-              aria-label="Stop"
-            >
-              <Square className="h-4 w-4 fill-current text-white" />
-            </Button>
-          ) : (
-            <Button
-              onClick={submit}
-              disabled={!input.trim()}
-              size="icon"
-              className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-r from-purple-600 to-purple-400 text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:opacity-95"
-              aria-label="Send"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
+              rows={1}
+              className="flex-1 resize-none bg-transparent px-2 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+            />
+            {isBusy ? (
+              <Button
+                onClick={stop}
+                size="icon"
+                className="h-10 w-10 shrink-0 rounded-full bg-red-500/90 hover:bg-red-600"
+                aria-label="Stop"
+              >
+                <Square className="h-4 w-4 fill-current text-white" />
+              </Button>
+            ) : (
+              <Button
+                onClick={submit}
+                disabled={!input.trim()}
+                size="icon"
+                className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-r from-purple-600 to-purple-400 text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:opacity-95"
+                aria-label="Send"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          {!question && !isBusy && (
+            <div className="mx-auto mt-3 flex max-w-xl flex-wrap justify-center gap-2">
+              {["Hello!", "What is photosynthesis?", "Explain TCP vs UDP", "Solve 2x + 3 = 11"].map(
+                (q) => (
+                  <button
+                    key={q}
+                    onClick={() => {
+                      setInput("");
+                      void handleAsk(q);
+                    }}
+                    className="rounded-full border border-purple-500/15 bg-white/[0.03] px-3 py-1.5 text-xs text-slate-300 backdrop-blur transition hover:border-purple-400/40 hover:text-white"
+                  >
+                    {q}
+                  </button>
+                ),
+              )}
+            </div>
           )}
         </div>
+      )}
 
-        {!question && !isBusy && (
-          <div className="mx-auto mt-3 flex max-w-xl flex-wrap justify-center gap-2">
-            {["Hello!", "What is photosynthesis?", "Explain TCP vs UDP", "Solve 2x + 3 = 11"].map(
-              (q) => (
-                <button
-                  key={q}
-                  onClick={() => {
-                    setInput("");
-                    void handleAsk(q);
-                  }}
-                  className="rounded-full border border-purple-500/15 bg-white/[0.03] px-3 py-1.5 text-xs text-slate-300 backdrop-blur transition hover:border-purple-400/40 hover:text-white"
-                >
-                  {q}
-                </button>
-              ),
-            )}
-          </div>
-        )}
-      </div>
 
       <Drawer open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DrawerContent className="border-purple-500/15 bg-[#0a1628] text-slate-100">
