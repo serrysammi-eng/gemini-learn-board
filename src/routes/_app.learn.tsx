@@ -1350,7 +1350,7 @@ function DiagramSVG({ diagram }: { diagram: NonNullable<Lesson["diagram"]> }) {
         const fontSize = Math.max(12, Math.min(maxFont, Math.floor((boxW - 16) / (longest * 0.5))));
         const lineHeight = fontSize + 2;
         const totalHeight = lineHeight * lines.length;
-        const startY = p.y + boxH / 2 - totalHeight / 2 + fontSize - 2;
+        const startY = p.y + (boxH - totalHeight) / 2 + fontSize;
         return (
           <g key={b.id}>
             <rect
