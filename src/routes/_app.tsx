@@ -31,8 +31,13 @@ const TABS = [
 function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [mounted, setMounted] = useState(false);
   const [tick, setTick] = useState(0);
+
+  // Only access localStorage after mount → matches SSR (no prefs) on first paint,
+  // then hydrates safely. Prevents hydration mismatch on the AppLayout root div.
   useEffect(() => {
+    setMounted(true);
     const prefs = getPrefs();
     if (!prefs) {
       navigate({ to: "/onboarding", replace: true });
@@ -56,13 +61,10 @@ function AppLayout() {
     };
   }, []);
 
-  const prefs = getPrefs();
-  const progress = getProgress();
-
-  // hide bottom nav from settings if you want; keep it for consistency
   void tick;
+  const prefs = mounted ? getPrefs() : null;
+  const progress = mounted ? getProgress() : { xp: 0, streak: 0 };
 
-  if (!prefs) return null;
 
   return (
     <div className="min-h-screen bg-[#060d1a] pb-24">
