@@ -572,19 +572,17 @@ function ChalkboardPage() {
           <div className="mx-auto flex max-w-xl items-end gap-2 rounded-3xl border border-purple-500/20 bg-white/[0.04] p-2 shadow-[0_4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl focus-within:border-purple-500/40 transition-all">
             <label
               className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-white/10"
-              aria-label="Attach image"
+              aria-label="Attach PDF, notes, code or image"
+              title="Attach PDF, notes, code or image"
             >
               <Paperclip className="h-4 w-4" />
               <input
                 type="file"
-                accept="image/*"
+                accept=".pdf,.txt,.md,.py,.js,.ts,.cpp,.c,.java,image/*"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f)
-                    setInput((cur) =>
-                      cur ? cur + ` (image: ${f.name})` : `Help me with this image: ${f.name}`,
-                    );
+                  if (f) handleFileAttach(f);
                   e.target.value = "";
                 }}
               />
