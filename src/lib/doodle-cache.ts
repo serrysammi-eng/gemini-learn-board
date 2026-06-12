@@ -77,7 +77,10 @@ export async function fetchDoodleImage(
   })();
 
   doodleInflight.set(key, promise);
-  promise.finally(() => doodleInflight.delete(key));
+  // Always attach a catch so fire-and-forget callers (pre-gen) don't leak
+  // as "Unhandled promise rejection". Real callers still get the rejection
+  // via the returned promise.
+  promise.catch(() => {}).finally(() => doodleInflight.delete(key));
   return promise;
 }
 
