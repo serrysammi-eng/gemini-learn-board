@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { setPrefs } from "@/lib/storage";
+import { ensureRoadmap } from "@/lib/roadmap";
 import {
   LANGUAGE_LABELS,
   LEVEL_LABELS,
@@ -58,14 +59,18 @@ function Onboarding() {
   const back = () => setStep((s) => Math.max(1, s - 1) as Step);
 
   const finish = (chosenTopic: string) => {
-    setPrefs({
+    const prefs = {
       name: name.trim() || "friend",
       language,
       subject,
       level,
       topic: chosenTopic,
       onboardedAt: Date.now(),
-    });
+    };
+    setPrefs(prefs);
+    // Kick off background roadmap + chapter image pre-generation immediately
+    // so every chapter's image is ready by the time the user opens the map.
+    void ensureRoadmap(prefs).catch(() => {});
     navigate({ to: "/learn", replace: true });
   };
 
