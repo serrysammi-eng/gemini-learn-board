@@ -414,9 +414,38 @@ function ChalkboardPage() {
   const submit = () => {
     const v = input.trim();
     if (!v) return;
+    // CRITICAL: prime audio synchronously inside the user-gesture click handler.
+    // Doing this before the async handleAsk preserves browser autoplay permission
+    // so the second/third lesson's speech also plays instead of going silent.
+    primeAudio();
     setInput("");
     void handleAsk(v);
   };
+
+  /** Conversational PDF / notes / code upload. Instead of silently OCR-ing or
+   *  parsing, we hand the file's name + a question back to the tutor and let
+   *  it ask the user "should I solve this, summarize it, or make notes?". */
+  const handleFileAttach = useCallback(
+    (file: File) => {
+      const name = file.name;
+      const lower = name.toLowerCase();
+      const kind = lower.endsWith(".pdf")
+        ? "PDF"
+        : lower.endsWith(".py")
+          ? "Python file"
+          : lower.endsWith(".txt") || lower.endsWith(".md")
+            ? "notes file"
+            : lower.match(/\.(png|jpe?g|webp)$/)
+              ? "image"
+              : "file";
+      // Synchronous primer for the audio that will follow.
+      primeAudio();
+      const q = `I just uploaded a ${kind} called "${name}". Ask me what I'd like you to do with it — solve the problems, summarize, make short notes, or explain the toughest parts — then break the answer into small bite-sized parts.`;
+      void handleAsk(q);
+    },
+    [handleAsk, primeAudio],
+  );
+
 
   const onLessonFinished = useCallback(() => {
     setStatus("done");
@@ -543,19 +572,17 @@ function ChalkboardPage() {
           <div className="mx-auto flex max-w-xl items-end gap-2 rounded-3xl border border-purple-500/20 bg-white/[0.04] p-2 shadow-[0_4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl focus-within:border-purple-500/40 transition-all">
             <label
               className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-white/10"
-              aria-label="Attach image"
+              aria-label="Attach PDF, notes, code or image"
+              title="Attach PDF, notes, code or image"
             >
               <Paperclip className="h-4 w-4" />
               <input
                 type="file"
-                accept="image/*"
+                accept=".pdf,.txt,.md,.py,.js,.ts,.cpp,.c,.java,image/*"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f)
-                    setInput((cur) =>
-                      cur ? cur + ` (image: ${f.name})` : `Help me with this image: ${f.name}`,
-                    );
+                  if (f) handleFileAttach(f);
                   e.target.value = "";
                 }}
               />
@@ -1467,36 +1494,90 @@ function Visualizer({ active }: { active: boolean }) {
 }
 
 /* ═══════════ Tab bar ═══════════ */
-const TAB_DEFS: { id: TabId; label: string; icon: typeof BookOpen; emoji: string }[] = [
-  { id: "lesson", label: "Lesson", icon: BookOpen, emoji: "📖" },
-  { id: "formulas", label: "Formulas", icon: Calculator, emoji: "🧮" },
-  { id: "tips", label: "Tips", icon: Lightbulb, emoji: "💡" },
-  { id: "code", label: "Code", icon: Code2, emoji: "💻" },
-  { id: "practice", label: "Practice", icon: FileText, emoji: "📝" },
+const TAB_DEFS: {
+  id: TabId;
+  label: string;
+  icon: typeof BookOpen;
+  emoji: string;
+  hue: string; // hex for the neon outline
+  desc: string;
+}[] = [
+  { id: "lesson", label: "Lesson", icon: BookOpen, emoji: "📖", hue: "#a78bfa", desc: "Live teach" },
+  { id: "formulas", label: "Formulas", icon: Calculator, emoji: "🧮", hue: "#22d3ee", desc: "Cheat sheet" },
+  { id: "tips", label: "Tips", icon: Lightbulb, emoji: "💡", hue: "#fbbf24", desc: "Memory tricks" },
+  { id: "code", label: "Code", icon: Code2, emoji: "💻", hue: "#34d399", desc: "Sandbox" },
+  { id: "practice", label: "Practice", icon: FileText, emoji: "📝", hue: "#f472b6", desc: "Paper" },
 ];
 
+/** Metro / subway gates row.  Five glass gates that slide "open" when active. */
 function TabBar({ tab, onChange }: { tab: TabId; onChange: (t: TabId) => void }) {
   return (
-    <div className="mx-auto flex max-w-2xl gap-1 overflow-x-auto rounded-full border border-purple-500/15 bg-white/[0.03] p-1 backdrop-blur-xl">
-      {TAB_DEFS.map((t) => {
-        const active = tab === t.id;
-        return (
-          <button
-            key={t.id}
-            onClick={() => onChange(t.id)}
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all sm:px-4 sm:text-sm",
-              active
-                ? "bg-gradient-to-r from-purple-600 to-purple-400 text-white shadow-[0_0_15px_rgba(139,92,246,0.4)]"
-                : "text-slate-400 hover:text-slate-200",
-            )}
-            aria-pressed={active}
-          >
-            <span className="text-base leading-none">{t.emoji}</span>
-            <span className="hidden sm:inline">{t.label}</span>
-          </button>
-        );
-      })}
+    <div className="mx-auto w-full max-w-2xl">
+      <div className="metro-gates flex items-stretch justify-between gap-1.5 rounded-2xl border border-purple-500/15 bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-1.5 backdrop-blur-xl">
+        {TAB_DEFS.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => onChange(t.id)}
+              aria-pressed={active}
+              className={cn(
+                "metro-gate group relative flex flex-1 select-none flex-col items-center justify-center overflow-hidden rounded-xl px-1 py-2 text-center transition-all duration-300",
+                active
+                  ? "metro-gate--open bg-black/40 text-white shadow-[inset_0_0_18px_rgba(0,0,0,0.5)]"
+                  : "bg-white/[0.02] text-slate-400 hover:bg-white/[0.05] hover:text-slate-200",
+              )}
+              style={{
+                boxShadow: active
+                  ? `0 0 0 1px ${t.hue}55, 0 0 22px ${t.hue}44`
+                  : undefined,
+              }}
+            >
+              {/* sliding doors */}
+              <span
+                aria-hidden
+                className="metro-door metro-door--l pointer-events-none absolute inset-y-0 left-0 w-1/2 origin-left"
+                style={{
+                  background: `linear-gradient(135deg, ${t.hue}33, transparent 70%)`,
+                  borderRight: `1px solid ${t.hue}66`,
+                }}
+              />
+              <span
+                aria-hidden
+                className="metro-door metro-door--r pointer-events-none absolute inset-y-0 right-0 w-1/2 origin-right"
+                style={{
+                  background: `linear-gradient(225deg, ${t.hue}33, transparent 70%)`,
+                  borderLeft: `1px solid ${t.hue}66`,
+                }}
+              />
+              {/* glyph */}
+              <span
+                className="relative z-10 text-xl leading-none transition-transform group-hover:scale-110"
+                style={{ filter: active ? `drop-shadow(0 0 6px ${t.hue})` : undefined }}
+              >
+                {t.emoji}
+              </span>
+              <span
+                className="relative z-10 mt-0.5 text-[10px] font-bold uppercase tracking-wider sm:text-[11px]"
+                style={{ color: active ? t.hue : undefined }}
+              >
+                {t.label}
+              </span>
+              {active && (
+                <span className="absolute bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full" style={{ background: t.hue, boxShadow: `0 0 8px ${t.hue}` }} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <style>{`
+        .metro-gate { min-height: 56px; }
+        .metro-door { transition: transform 320ms cubic-bezier(.7,.2,.2,1), opacity 320ms ease; }
+        .metro-gate--open .metro-door--l { transform: translateX(-101%); opacity: 0; }
+        .metro-gate--open .metro-door--r { transform: translateX(101%); opacity: 0; }
+        .metro-gate:not(.metro-gate--open):hover .metro-door--l { transform: translateX(-15%); }
+        .metro-gate:not(.metro-gate--open):hover .metro-door--r { transform: translateX(15%); }
+      `}</style>
     </div>
   );
 }

@@ -81,7 +81,7 @@ export function ensureRoadmap(prefs: UserPrefs): Promise<Roadmap> {
     // Still kick off pre-gen in case the in-memory cache is empty (e.g. page reload)
     void preGenerateDoodles(
       existing!.chapters.map((c) => ({ line: c.title, topic: prefs.topic })),
-      2,
+      4,
     );
     return Promise.resolve(existing!);
   }
@@ -90,9 +90,12 @@ export function ensureRoadmap(prefs: UserPrefs): Promise<Roadmap> {
     try {
       const r = await generateRoadmap(prefs);
       setRoadmap(r);
+      // Higher concurrency = entire roadmap's images warm in the background
+      // as fast as the gateway allows. User clicks any chapter and the image
+      // is already cached.
       void preGenerateDoodles(
         r.chapters.map((c) => ({ line: c.title, topic: prefs.topic })),
-        2,
+        4,
       );
       return r;
     } finally {
