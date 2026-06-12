@@ -414,9 +414,38 @@ function ChalkboardPage() {
   const submit = () => {
     const v = input.trim();
     if (!v) return;
+    // CRITICAL: prime audio synchronously inside the user-gesture click handler.
+    // Doing this before the async handleAsk preserves browser autoplay permission
+    // so the second/third lesson's speech also plays instead of going silent.
+    primeAudio();
     setInput("");
     void handleAsk(v);
   };
+
+  /** Conversational PDF / notes / code upload. Instead of silently OCR-ing or
+   *  parsing, we hand the file's name + a question back to the tutor and let
+   *  it ask the user "should I solve this, summarize it, or make notes?". */
+  const handleFileAttach = useCallback(
+    (file: File) => {
+      const name = file.name;
+      const lower = name.toLowerCase();
+      const kind = lower.endsWith(".pdf")
+        ? "PDF"
+        : lower.endsWith(".py")
+          ? "Python file"
+          : lower.endsWith(".txt") || lower.endsWith(".md")
+            ? "notes file"
+            : lower.match(/\.(png|jpe?g|webp)$/)
+              ? "image"
+              : "file";
+      // Synchronous primer for the audio that will follow.
+      primeAudio();
+      const q = `I just uploaded a ${kind} called "${name}". Ask me what I'd like you to do with it — solve the problems, summarize, make short notes, or explain the toughest parts — then break the answer into small bite-sized parts.`;
+      void handleAsk(q);
+    },
+    [handleAsk, primeAudio],
+  );
+
 
   const onLessonFinished = useCallback(() => {
     setStatus("done");
