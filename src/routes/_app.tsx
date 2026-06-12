@@ -101,7 +101,7 @@ function AppLayout() {
               >
                 StudyMate
               </div>
-              <div className="text-xs text-slate-500 leading-tight">Hi, {prefs.name}!</div>
+              <div className="text-xs text-slate-500 leading-tight">Hi, {prefs?.name ?? "friend"}!</div>
             </div>
           </Link>
           <div className="flex items-center gap-2">
