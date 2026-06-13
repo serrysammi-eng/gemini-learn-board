@@ -55,9 +55,24 @@ EXAMPLE:
 
 END`;
 
+        // RAG: factual reference for the chapter title. Best-effort.
+        let ragSuffix = "";
+        try {
+          const { buildRagContext, ragSystemSuffix } = await import("@/lib/rag.server");
+          const { context } = await buildRagContext({
+            topic: body.title,
+            subject: body.topic,
+            level: body.level,
+            language: lang,
+          });
+          ragSuffix = ragSystemSuffix(context, level, lang);
+        } catch {
+          /* RAG is optional */
+        }
+
         const result = streamText({
           model: provider(model),
-          system,
+          system: system + ragSuffix,
           prompt: `Roadmap context: ${body.topic ? `topic = ${body.topic}` : ""}
 Chapter title: ${body.title}
 Chapter summary hint: ${body.summary || "—"}

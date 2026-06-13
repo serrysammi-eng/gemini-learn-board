@@ -16,9 +16,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  doodleCache,
-  doodleKey,
-  fetchDoodleImage,
+  fetchWikimediaImage,
+  getCachedWikimedia,
   instantDoodle,
 } from "@/lib/doodle-cache";
 import { ensureRoadmap, type Roadmap, type RoadmapChapter } from "@/lib/roadmap";
@@ -338,25 +337,27 @@ function SnakeTile({
   topic?: string;
   onClick: () => void;
 }) {
-  // Use Pollinations for instant preview; Lovable AI quietly upgrades when ready.
+  // Wikipedia thumbnail first → real diagram, instant. Falls back to the
+  // Pollinations chalk doodle if Wikipedia has no image for this title.
   const fallback = useMemo(() => instantDoodle(chapter.title, topic), [chapter.title, topic]);
-  const cached = doodleCache.get(doodleKey(chapter.title));
-  const [aiSrc, setAiSrc] = useState<string | null>(cached || null);
+  const cachedWiki = getCachedWikimedia(chapter.title);
+  const [wikiSrc, setWikiSrc] = useState<string | null>(
+    cachedWiki === undefined ? null : cachedWiki,
+  );
   useEffect(() => {
-    if (cached) {
-      setAiSrc(cached);
-      return;
-    }
-    const ctrl = new AbortController();
-    fetchDoodleImage(chapter.title, topic, ctrl.signal)
+    if (cachedWiki !== undefined) return;
+    let cancelled = false;
+    fetchWikimediaImage(chapter.title)
       .then((u) => {
-        if (!ctrl.signal.aborted && u) setAiSrc(u);
+        if (!cancelled) setWikiSrc(u);
       })
       .catch(() => {});
-    return () => ctrl.abort();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapter.title, topic]);
-  const finalSrc = aiSrc || fallback;
+  }, [chapter.title]);
+  const finalSrc = wikiSrc || fallback;
 
   return (
     <button
@@ -576,23 +577,24 @@ function ChapterModal({
 
 function ChapterVisual({ line, topic }: { line: string; topic?: string }) {
   const fallback = useMemo(() => instantDoodle(line, topic), [line, topic]);
-  const cached = doodleCache.get(doodleKey(line));
-  const [aiSrc, setAiSrc] = useState<string | null>(cached || null);
+  const cachedWiki = getCachedWikimedia(line);
+  const [wikiSrc, setWikiSrc] = useState<string | null>(
+    cachedWiki === undefined ? null : cachedWiki,
+  );
   useEffect(() => {
-    if (cached) {
-      setAiSrc(cached);
-      return;
-    }
-    const ctrl = new AbortController();
-    fetchDoodleImage(line, topic, ctrl.signal)
+    if (cachedWiki !== undefined) return;
+    let cancelled = false;
+    fetchWikimediaImage(line)
       .then((u) => {
-        if (!ctrl.signal.aborted && u) setAiSrc(u);
+        if (!cancelled) setWikiSrc(u);
       })
       .catch(() => {});
-    return () => ctrl.abort();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [line, topic]);
-  const finalSrc = aiSrc || fallback;
+  }, [line]);
+  const finalSrc = wikiSrc || fallback;
   return (
     <div className="relative h-44 w-full overflow-hidden bg-[#060d1a] sm:h-52">
       <img

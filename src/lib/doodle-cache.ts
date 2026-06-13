@@ -3,13 +3,45 @@ import { pollinationsUrl } from "./pollinations";
 /**
  * Shared module-level cache for AI-generated doodle images.
  * Keyed by line.toLowerCase().trim(). Values are data URLs (base64 PNG)
- * returned by the Lovable AI gateway, OR Pollinations URLs as a fast fallback.
+ * from the Lovable AI gateway, OR Pollinations URLs as a fast fallback,
+ * OR Wikipedia thumbnail URLs.
  *
- * Lives in memory only — base64 PNGs are too large for localStorage.
- * Re-populated by Roadmap background pre-generation after onboarding.
+ * URLs are mirrored into localStorage (best-effort, quota-safe) under
+ * `studymate.doodle:<key>` so images survive page reloads.
  */
 export const doodleCache = new Map<string, string>();
 export const doodleInflight = new Map<string, Promise<string>>();
+
+const LS_PREFIX = "studymate.doodle:";
+let hydrated = false;
+
+function hydrateFromStorage() {
+  if (hydrated || typeof window === "undefined") return;
+  hydrated = true;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(LS_PREFIX)) continue;
+      const v = localStorage.getItem(k);
+      if (v) doodleCache.set(k.slice(LS_PREFIX.length), v);
+    }
+  } catch {
+    /* noop */
+  }
+}
+hydrateFromStorage();
+
+function persistToStorage(key: string, url: string) {
+  if (typeof window === "undefined") return;
+  try {
+    // Skip absurdly large base64 payloads to avoid blowing the 5MB quota
+    // on a single image. Pollinations / Wikimedia URLs persist freely.
+    if (url.startsWith("data:") && url.length > 350_000) return;
+    localStorage.setItem(LS_PREFIX + key, url);
+  } catch {
+    /* quota — silently skip */
+  }
+}
 
 export function doodleKey(line: string): string {
   return (line || "").trim().toLowerCase();
@@ -21,8 +53,6 @@ export function getCachedDoodle(line: string): string | null {
 
 /**
  * Stream a doodle from /api/doodle-image. Caches the final frame.
- * Re-uses an in-flight request for the same key so duplicate callers
- * (e.g. learn page + roadmap pre-gen) don't double-bill.
  */
 export async function fetchDoodleImage(
   line: string,
@@ -72,35 +102,79 @@ export async function fetchDoodleImage(
       if (done) break;
       parser.feed(value);
     }
-    if (finalUrl) doodleCache.set(key, finalUrl);
+    if (finalUrl) {
+      doodleCache.set(key, finalUrl);
+      persistToStorage(key, finalUrl);
+    }
     return finalUrl;
   })();
 
   doodleInflight.set(key, promise);
-  // Always attach a catch so fire-and-forget callers (pre-gen) don't leak
-  // as "Unhandled promise rejection". Real callers still get the rejection
-  // via the returned promise.
   promise.catch(() => {}).finally(() => doodleInflight.delete(key));
   return promise;
 }
 
 /**
- * Pollinations fallback — used as an instant placeholder while the slower
- * Lovable AI image is being generated. Returns a direct URL, no fetch.
+ * Pollinations fallback — instant placeholder, no fetch.
  */
 export function instantDoodle(line: string, topic?: string): string {
   return pollinationsUrl(line, topic);
 }
 
 /**
- * Fire-and-forget background pre-generation. Throttled to N concurrent
- * requests so we don't hammer the gateway on onboarding completion.
+ * Wikipedia thumbnail — instant real-photo background for roadmap tiles.
+ * Returns the cached value (or null) on subsequent calls so callers can
+ * cheaply read the result without re-fetching.
+ */
+const wikiCache = new Map<string, string | null>();
+const wikiInflight = new Map<string, Promise<string | null>>();
+
+export function getCachedWikimedia(topic: string): string | null | undefined {
+  return wikiCache.get(doodleKey(topic));
+}
+
+export async function fetchWikimediaImage(topic: string): Promise<string | null> {
+  const key = doodleKey(topic);
+  if (!key) return null;
+  if (wikiCache.has(key)) return wikiCache.get(key) ?? null;
+  const existing = wikiInflight.get(key);
+  if (existing) return existing;
+  const p = (async () => {
+    try {
+      const slug = encodeURIComponent(topic.trim().replace(/\s+/g, "_"));
+      const res = await fetch(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${slug}`,
+        { headers: { Accept: "application/json" } },
+      );
+      if (!res.ok) return null;
+      const j = (await res.json()) as {
+        thumbnail?: { source?: string };
+        originalimage?: { source?: string };
+      };
+      return j.thumbnail?.source ?? j.originalimage?.source ?? null;
+    } catch {
+      return null;
+    }
+  })();
+  wikiInflight.set(key, p);
+  const url = await p.finally(() => wikiInflight.delete(key));
+  wikiCache.set(key, url);
+  return url;
+}
+
+/**
+ * Fire-and-forget background pre-generation.
+ *
+ * - Hard concurrency cap of 2 to avoid flooding the AI gateway.
+ * - If more than 20 items are queued, only the first 6 are pre-generated;
+ *   the rest are lazy-loaded on demand by the on-screen tiles themselves.
  */
 export async function preGenerateDoodles(
   lines: { line: string; topic?: string }[],
-  concurrency = 2,
+  _concurrency = 2,
 ): Promise<void> {
-  const queue = [...lines];
+  const concurrency = Math.min(2, Math.max(1, _concurrency));
+  const queue = lines.length > 20 ? lines.slice(0, 6) : [...lines];
   const workers: Promise<void>[] = [];
   for (let i = 0; i < concurrency; i++) {
     workers.push(
@@ -113,7 +187,7 @@ export async function preGenerateDoodles(
             const ctrl = new AbortController();
             await fetchDoodleImage(next.line, next.topic, ctrl.signal);
           } catch {
-            /* skip failed pre-gen; on-demand request will retry */
+            /* on-demand request will retry */
           }
         }
       })(),

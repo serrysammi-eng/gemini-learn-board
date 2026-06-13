@@ -33,6 +33,8 @@ import {
   doodleCache as sharedDoodleCache,
   doodleKey,
   fetchDoodleImage as sharedFetchDoodleImage,
+  fetchWikimediaImage,
+  getCachedWikimedia,
   instantDoodle,
 } from "@/lib/doodle-cache";
 import {
@@ -917,43 +919,70 @@ function ChatOnly({ text }: { text: string }) {
 
 
 function DoodleBox({ line, topic }: { line: string; topic?: string }) {
-  // Pollinations URL — instant, no fetch, just an <img src=…>.
+  // 1) Wikipedia thumbnail — instant real diagram for the lesson topic.
+  //    Prefer the topic (the broad subject the user asked about) over the
+  //    currently spoken line, since Wikipedia returns better article images
+  //    for nouns than for sentence fragments.
+  const wikiQuery = (topic || line || "").trim();
+  const cachedWiki = getCachedWikimedia(wikiQuery);
+  const [wikiSrc, setWikiSrc] = useState<string | null>(
+    cachedWiki === undefined ? null : cachedWiki,
+  );
+  useEffect(() => {
+    if (!wikiQuery || cachedWiki !== undefined) return;
+    let cancelled = false;
+    fetchWikimediaImage(wikiQuery)
+      .then((u) => {
+        if (!cancelled) setWikiSrc(u);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wikiQuery]);
+
+  // 2) Pollinations chalk doodle — also instant (URL only, no fetch).
   const pollSrc = useMemo(() => {
     if (!line || line.trim().length < 4) return null;
     return instantDoodle(line, topic);
   }, [line, topic]);
 
-  // Lovable AI upgrade — streams in (partial frames included) and replaces Pollinations.
+  // 3) HD AI art — only when the user explicitly taps the button.
   const [aiSrc, setAiSrc] = useState<string | null>(() =>
     line ? sharedDoodleCache.get(doodleKey(line)) ?? null : null,
   );
-
+  const [hdLoading, setHdLoading] = useState(false);
+  const [hdRequested, setHdRequested] = useState(false);
   useEffect(() => {
-    if (!line || line.trim().length < 4) return;
-    const cached = sharedDoodleCache.get(doodleKey(line));
-    if (cached) {
-      flushSyncSafe(() => setAiSrc(cached));
-      return;
-    }
-    setAiSrc(null);
+    // Reset HD state when the line changes; don't auto-fetch.
+    setAiSrc(line ? sharedDoodleCache.get(doodleKey(line)) ?? null : null);
+    setHdRequested(false);
+    setHdLoading(false);
+  }, [line]);
+
+  const triggerHd = useCallback(() => {
+    if (!line || hdLoading) return;
+    setHdRequested(true);
+    setHdLoading(true);
     const ctrl = new AbortController();
-    sharedFetchDoodleImage(line, topic, ctrl.signal, (partialUrl) => {
-      if (ctrl.signal.aborted || !partialUrl) return;
-      flushSyncSafe(() => setAiSrc(partialUrl));
+    sharedFetchDoodleImage(line, topic, ctrl.signal, (partial) => {
+      if (!ctrl.signal.aborted && partial) flushSyncSafe(() => setAiSrc(partial));
     })
       .then((finalUrl) => {
-        if (ctrl.signal.aborted || !finalUrl) return;
-        flushSyncSafe(() => setAiSrc(finalUrl));
+        if (!ctrl.signal.aborted && finalUrl) flushSyncSafe(() => setAiSrc(finalUrl));
       })
-      .catch(() => {});
-    return () => ctrl.abort();
-  }, [line, topic]);
+      .catch(() => {})
+      .finally(() => setHdLoading(false));
+  }, [line, topic, hdLoading]);
 
-  const displaySrc = aiSrc || pollSrc;
+  // Picture priority: HD AI (if generated) → Wikipedia → Pollinations.
+  const displaySrc = aiSrc || wikiSrc || pollSrc;
+  const isRealDiagram = !aiSrc && !!wikiSrc;
   const showSketching = !displaySrc && !!line && line.trim().length >= 4;
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#060d1a]">
-      {/* dotted board backdrop */}
       <svg className="absolute inset-0 h-full w-full" aria-hidden>
         <defs>
           <pattern id="ddots" width="14" height="14" patternUnits="userSpaceOnUse">
@@ -969,7 +998,7 @@ function DoodleBox({ line, topic }: { line: string; topic?: string }) {
           src={displaySrc}
           alt=""
           className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
-          style={{ mixBlendMode: "screen" }}
+          style={{ mixBlendMode: isRealDiagram ? "normal" : "screen" }}
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
@@ -980,20 +1009,34 @@ function DoodleBox({ line, topic }: { line: string; topic?: string }) {
           <div className="flex flex-col items-center gap-2">
             <div className="h-8 w-8 animate-pulse rounded-full bg-purple-500/30" />
             <div className="hand text-sm text-purple-300/80 animate-pulse">
-              Sketching…
+              Loading visual…
             </div>
           </div>
         </div>
       )}
 
-      <style>{`
-        @keyframes kenburns-learn {
-          0%   { transform: scale(1.0) translate(0,0); }
-          50%  { transform: scale(1.08) translate(-2%, -1.5%); }
-          100% { transform: scale(1.0) translate(0,0); }
-        }
-        .doodle-kenburns-learn { animation: kenburns-learn 8s ease-in-out infinite; }
-      `}</style>
+      {/* Real Diagram badge — only when showing Wikipedia thumbnail */}
+      {isRealDiagram && (
+        <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-emerald-500/85 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_2px_8px_rgba(16,185,129,0.5)]">
+          📖 Real Diagram
+        </div>
+      )}
+
+      {/* Generate HD Art button */}
+      {!hdRequested && !!line && line.trim().length >= 4 && (
+        <button
+          type="button"
+          onClick={triggerHd}
+          className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 rounded-full bg-purple-500/90 px-3 py-1.5 text-[11px] font-semibold text-white shadow-[0_2px_12px_rgba(139,92,246,0.5)] backdrop-blur transition hover:bg-purple-500"
+        >
+          <Sparkles className="h-3 w-3" /> Generate HD Art
+        </button>
+      )}
+      {hdLoading && (
+        <div className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[11px] font-medium text-purple-200 backdrop-blur">
+          <Loader2 className="h-3 w-3 animate-spin" /> Rendering HD…
+        </div>
+      )}
     </div>
   );
 }
