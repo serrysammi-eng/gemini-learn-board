@@ -33,6 +33,8 @@ import {
   doodleCache as sharedDoodleCache,
   doodleKey,
   fetchDoodleImage as sharedFetchDoodleImage,
+  fetchWikimediaImage,
+  getCachedWikimedia,
   instantDoodle,
 } from "@/lib/doodle-cache";
 import {
