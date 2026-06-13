@@ -577,23 +577,24 @@ function ChapterModal({
 
 function ChapterVisual({ line, topic }: { line: string; topic?: string }) {
   const fallback = useMemo(() => instantDoodle(line, topic), [line, topic]);
-  const cached = doodleCache.get(doodleKey(line));
-  const [aiSrc, setAiSrc] = useState<string | null>(cached || null);
+  const cachedWiki = getCachedWikimedia(line);
+  const [wikiSrc, setWikiSrc] = useState<string | null>(
+    cachedWiki === undefined ? null : cachedWiki,
+  );
   useEffect(() => {
-    if (cached) {
-      setAiSrc(cached);
-      return;
-    }
-    const ctrl = new AbortController();
-    fetchDoodleImage(line, topic, ctrl.signal)
+    if (cachedWiki !== undefined) return;
+    let cancelled = false;
+    fetchWikimediaImage(line)
       .then((u) => {
-        if (!ctrl.signal.aborted && u) setAiSrc(u);
+        if (!cancelled) setWikiSrc(u);
       })
       .catch(() => {});
-    return () => ctrl.abort();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [line, topic]);
-  const finalSrc = aiSrc || fallback;
+  }, [line]);
+  const finalSrc = wikiSrc || fallback;
   return (
     <div className="relative h-44 w-full overflow-hidden bg-[#060d1a] sm:h-52">
       <img
