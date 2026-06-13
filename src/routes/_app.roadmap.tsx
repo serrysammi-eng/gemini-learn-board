@@ -337,25 +337,27 @@ function SnakeTile({
   topic?: string;
   onClick: () => void;
 }) {
-  // Use Pollinations for instant preview; Lovable AI quietly upgrades when ready.
+  // Wikipedia thumbnail first → real diagram, instant. Falls back to the
+  // Pollinations chalk doodle if Wikipedia has no image for this title.
   const fallback = useMemo(() => instantDoodle(chapter.title, topic), [chapter.title, topic]);
-  const cached = doodleCache.get(doodleKey(chapter.title));
-  const [aiSrc, setAiSrc] = useState<string | null>(cached || null);
+  const cachedWiki = getCachedWikimedia(chapter.title);
+  const [wikiSrc, setWikiSrc] = useState<string | null>(
+    cachedWiki === undefined ? null : cachedWiki,
+  );
   useEffect(() => {
-    if (cached) {
-      setAiSrc(cached);
-      return;
-    }
-    const ctrl = new AbortController();
-    fetchDoodleImage(chapter.title, topic, ctrl.signal)
+    if (cachedWiki !== undefined) return;
+    let cancelled = false;
+    fetchWikimediaImage(chapter.title)
       .then((u) => {
-        if (!ctrl.signal.aborted && u) setAiSrc(u);
+        if (!cancelled) setWikiSrc(u);
       })
       .catch(() => {});
-    return () => ctrl.abort();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapter.title, topic]);
-  const finalSrc = aiSrc || fallback;
+  }, [chapter.title]);
+  const finalSrc = wikiSrc || fallback;
 
   return (
     <button
