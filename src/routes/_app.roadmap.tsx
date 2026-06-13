@@ -16,9 +16,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  doodleCache,
-  doodleKey,
-  fetchDoodleImage,
+  fetchWikimediaImage,
+  getCachedWikimedia,
   instantDoodle,
 } from "@/lib/doodle-cache";
 import { ensureRoadmap, type Roadmap, type RoadmapChapter } from "@/lib/roadmap";
